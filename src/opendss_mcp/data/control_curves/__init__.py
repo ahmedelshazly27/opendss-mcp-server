@@ -1,0 +1,3 @@
+"""
+Control curves data package.
+"""

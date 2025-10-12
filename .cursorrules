@@ -1,0 +1,820 @@
+# OpenDSS MCP Server - Cursor Rules
+
+## Project Overview
+
+You are building an **OpenDSS MCP (Model Context Protocol) Server** - a conversational interface for EPRI's Open Distribution System Simulator that enables AI assistants like Claude to perform power systems analysis through natural language.
+
+### Mission
+Create a production-ready MCP server that reduces distribution planning studies from 2-3 weeks to 30 minutes through conversational AI interaction.
+
+### Target Users
+- Distribution planning engineers
+- DER integration specialists
+- Power systems consultants
+- Utility planning departments
+- Graduate students/researchers
+
+---
+
+## Technology Stack
+
+### Core Technologies
+- **Language:** Python 3.10+
+- **MCP Framework:** `@modelcontextprotocol/sdk` (Python)
+- **OpenDSS:** `opendssdirect.py` (EPRI's official Python bindings)
+- **Data Processing:** pandas, numpy
+- **Visualization:** matplotlib, networkx
+- **Testing:** pytest, pytest-cov
+- **Linting:** black, pylint, mypy
+
+### Project Structure
+```
+opendss-mcp-server/
+├── src/opendss_mcp/
+│   ├── server.py              # MCP server entry point
+│   ├── tools/                 # 7 MCP tools
+│   ├── utils/                 # Helpers and wrappers
+│   └── data/                  # IEEE feeders, profiles, curves
+├── tests/                     # Comprehensive test suite
+├── docs/                      # Documentation
+├── examples/                  # Example scripts
+└── pyproject.toml            # Dependencies and config
+```
+
+---
+
+## Code Style & Standards
+
+### Python Conventions
+```python
+# Always use type hints
+def run_power_flow(
+    scenario_name: str | None = None,
+    solve_mode: str = "snap",
+    harmonic_analysis: bool = False
+) -> dict[str, Any]:
+    """Run power flow analysis on current circuit.
+    
+    Args:
+        scenario_name: Optional scenario label for tracking
+        solve_mode: "snap" | "daily" | "yearly"
+        harmonic_analysis: Enable harmonics frequency scan
+        
+    Returns:
+        Structured result dict with voltages, flows, losses
+        
+    Raises:
+        ValueError: If solve_mode invalid
+        RuntimeError: If OpenDSS solve fails
+    """
+    pass
+
+# Use descriptive variable names
+bus_voltages_pu = get_all_bus_voltages()
+min_voltage_pu = min(bus_voltages_pu.values())
+
+# Constants in UPPER_CASE
+DEFAULT_MIN_VOLTAGE_PU = 0.95
+DEFAULT_MAX_VOLTAGE_PU = 1.05
+```
+
+### Formatting
+- **Line length:** 100 characters
+- **Formatter:** black
+- **Linter:** pylint (target score >8.0)
+- **Type checker:** mypy (strict mode)
+
+### Documentation
+```python
+# Google-style docstrings for all public functions
+def optimize_der_placement(
+    der_type: str,
+    capacity_kw: float,
+    objective: str = "minimize_losses"
+) -> dict[str, Any]:
+    """Find optimal bus location for DER placement.
+    
+    This function iterates through candidate buses, places the DER
+    at each location, runs power flow, and evaluates the objective
+    function to determine the best placement.
+    
+    Args:
+        der_type: Type of DER - "solar", "battery", "solar_battery", 
+                  "ev_charger", "solar_vvc" (with volt-var control)
+        capacity_kw: Rated capacity in kilowatts
+        objective: Optimization objective - "minimize_losses",
+                   "maximize_capacity", "minimize_violations"
+                   
+    Returns:
+        dict containing:
+            - optimal_bus: str, best bus ID
+            - optimal_capacity_kw: float, recommended capacity
+            - improvement_metrics: dict with loss reduction, etc.
+            - comparison_table: list of top candidates
+            
+    Example:
+        >>> result = optimize_der_placement(
+        ...     der_type="solar_vvc",
+        ...     capacity_kw=2000,
+        ...     objective="minimize_losses"
+        ... )
+        >>> print(f"Best location: {result['optimal_bus']}")
+        Best location: Bus76
+    """
+    pass
+```
+
+---
+
+## OpenDSS Integration Rules
+
+### Using opendssdirect.py
+```python
+import opendssdirect as dss
+
+# ALWAYS wrap OpenDSS calls in try-except
+try:
+    dss.Text.Command("Solve")
+    if not dss.Solution.Converged():
+        raise RuntimeError("Power flow did not converge")
+except Exception as e:
+    return {
+        "success": False,
+        "errors": [f"OpenDSS error: {str(e)}"]
+    }
+
+# Get bus voltages (returns per-unit)
+bus_names = dss.Circuit.AllBusNames()
+voltages = {}
+for bus in bus_names:
+    dss.Circuit.SetActiveBus(bus)
+    # GetActiveBus returns [V1_mag, V1_ang, V2_mag, V2_ang, ...]
+    volts = dss.Bus.puVmagAngle()
+    # Take first phase magnitude
+    voltages[bus] = volts[0] if volts else 0.0
+
+# Add PV system to bus
+dss.Text.Command(f"New PVSystem.PV1 Bus1={bus_id} kV={voltage_kv} kVA={capacity_kw}")
+dss.Text.Command(f"~ Pmpp={capacity_kw} irradiance=1.0")
+```
+
+### State Management
+```python
+# NEVER assume persistent OpenDSS state between tool calls
+# Each tool should verify circuit state or reload if needed
+
+class DSSCircuit:
+    def __init__(self):
+        self.current_feeder: str | None = None
+        self.dss_file_path: str | None = None
+        
+    def reset(self):
+        """Clear circuit and reset to initial state."""
+        dss.Text.Command("Clear")
+        self.current_feeder = None
+        
+    def reload_feeder(self):
+        """Reload current feeder from file."""
+        if self.dss_file_path:
+            dss.Text.Command(f"Redirect {self.dss_file_path}")
+```
+
+### Error Handling
+```python
+# ALWAYS return structured responses, never raise to MCP layer
+def some_tool_function() -> dict[str, Any]:
+    try:
+        # Tool logic here
+        return {
+            "success": True,
+            "data": {...},
+            "metadata": {...}
+        }
+    except ValueError as e:
+        return {
+            "success": False,
+            "errors": [f"Invalid input: {str(e)}"],
+            "data": None
+        }
+    except RuntimeError as e:
+        return {
+            "success": False, 
+            "errors": [f"OpenDSS runtime error: {str(e)}"],
+            "data": None
+        }
+```
+
+---
+
+## MCP Tool Implementation Pattern
+
+### Tool Structure
+```python
+# src/opendss_mcp/tools/example_tool.py
+
+from typing import Any
+import opendssdirect as dss
+from ..utils.validators import validate_bus_id, validate_positive_float
+
+def example_tool(
+    bus_id: str,
+    capacity_kw: float,
+    options: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Tool description for MCP registration.
+    
+    This docstring becomes the tool description shown to the AI.
+    Be clear and specific about what the tool does.
+    """
+    
+    # 1. Validate inputs
+    try:
+        validate_bus_id(bus_id)
+        validate_positive_float(capacity_kw, "capacity_kw")
+    except ValueError as e:
+        return {
+            "success": False,
+            "errors": [str(e)],
+            "data": None
+        }
+    
+    # 2. Check circuit state
+    if not dss.Circuit.Name():
+        return {
+            "success": False,
+            "errors": ["No circuit loaded. Load a feeder first."],
+            "data": None
+        }
+    
+    # 3. Perform operation
+    try:
+        # Tool logic here
+        result_data = {...}
+        
+        return {
+            "success": True,
+            "data": result_data,
+            "metadata": {
+                "computation_time_seconds": elapsed_time,
+                "tool_version": "1.0.0"
+            }
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "errors": [f"Operation failed: {str(e)}"],
+            "data": None
+        }
+
+# Tool registration in server.py
+@server.tool()
+async def example_tool_mcp(
+    bus_id: str,
+    capacity_kw: float,
+    options: dict | None = None
+) -> dict:
+    """Tool description shown to Claude."""
+    return example_tool(bus_id, capacity_kw, options)
+```
+
+---
+
+## The 7 Core Tools (Implementation Order)
+
+### 1. load_ieee_test_feeder
+**Priority:** Phase 1 (Day 1)
+**Purpose:** Load IEEE 13, 34, or 123 bus test feeders
+
+```python
+def load_ieee_test_feeder(
+    feeder_id: str,
+    modifications: dict | None = None
+) -> dict[str, Any]:
+    """Load standard IEEE test feeder for analysis.
+    
+    Supports IEEE13, IEEE34, IEEE123 bus systems.
+    """
+    # Validate feeder_id
+    # Load DSS file from data/ieee_feeders/
+    # Parse circuit to get metadata
+    # Return structured data
+```
+
+**Returns:**
+```json
+{
+  "success": true,
+  "data": {
+    "num_buses": 123,
+    "num_lines": 117,
+    "total_load_kw": 3490.0,
+    "voltage_bases_kv": [4.16, 0.48]
+  }
+}
+```
+
+---
+
+### 2. run_power_flow (+ harmonics)
+**Priority:** Phase 1 (Day 1) base, Phase 4 (Day 3) harmonics
+**Purpose:** Run power flow with optional harmonics analysis
+
+```python
+def run_power_flow(
+    scenario_name: str | None = None,
+    solve_mode: str = "snap",
+    control_mode: str = "static",
+    harmonic_analysis: bool = False,
+    harmonic_orders: list[int] | None = None
+) -> dict[str, Any]:
+    """Run power flow and return voltage/power results.
+    
+    If harmonic_analysis=True, also performs frequency scan
+    and calculates THD for voltages and currents.
+    """
+    # Run solve
+    # Get voltages, flows, losses
+    # If harmonics enabled: run frequency scan
+    # Calculate THD values
+    # Return structured data
+```
+
+**Harmonics Implementation:**
+```python
+# In utils/harmonics.py
+def calculate_thd(harmonics_dict: dict[int, float]) -> float:
+    """Calculate Total Harmonic Distortion.
+    
+    THD = sqrt(sum(H_n^2 for n > 1)) / H_1
+    """
+    fundamental = harmonics_dict.get(1, 0.0)
+    if fundamental == 0:
+        return 0.0
+    
+    harmonic_sum = sum(v**2 for k, v in harmonics_dict.items() if k > 1)
+    return (harmonic_sum ** 0.5) / fundamental * 100
+
+def run_frequency_scan(
+    orders: list[int] = [3, 5, 7, 9, 11, 13]
+) -> dict[str, dict[int, float]]:
+    """Run OpenDSS frequency scan for harmonic analysis."""
+    results = {}
+    
+    for order in orders:
+        freq = 60 * order  # Assuming 60 Hz base
+        dss.Text.Command(f"Set mode=harmonic")
+        dss.Text.Command(f"Set harmonic={order}")
+        dss.Text.Command("Solve")
+        
+        # Collect voltage magnitudes at this harmonic
+        # Store in results dict
+    
+    return results
+```
+
+---
+
+### 3. optimize_der_placement (+ volt-var)
+**Priority:** Phase 3 (Day 2) base, Phase 4 (Day 3) volt-var
+**Purpose:** Find optimal DER location with optional smart inverter controls
+
+```python
+def optimize_der_placement(
+    der_type: str,
+    capacity_kw: float,
+    battery_kwh: float | None = None,
+    objective: str = "minimize_losses",
+    candidate_buses: list[str] | None = None,
+    constraints: dict | None = None,
+    control_settings: dict | None = None
+) -> dict[str, Any]:
+    """Optimize DER placement with volt-var/volt-watt control.
+    
+    der_type options:
+        - "solar", "battery", "solar_battery"
+        - "solar_vvc", "solar_battery_vvc" (with volt-var control)
+    """
+    # Get baseline metrics
+    # For each candidate bus:
+    #   - Add DER at location
+    #   - Configure controls if enabled
+    #   - Run power flow
+    #   - Calculate objective value
+    # Rank and return top locations
+```
+
+**Volt-Var Control Implementation:**
+```python
+# In utils/inverter_control.py
+def configure_volt_var_control(
+    pv_name: str,
+    bus_id: str,
+    volt_var_curve: str = "IEEE1547"
+) -> None:
+    """Configure InvControl object for volt-var operation.
+    
+    Args:
+        pv_name: Name of PVSystem element
+        bus_id: Bus where PV is connected
+        volt_var_curve: "IEEE1547", "RULE21", or custom curve name
+    """
+    # Load curve points from data/control_curves/
+    curve_points = load_curve(volt_var_curve)
+    
+    # Create XY curve in OpenDSS
+    dss.Text.Command(f"New XYCurve.{pv_name}_vvc npts={len(curve_points)}")
+    dss.Text.Command(f"~ xarray=[{','.join(str(x) for x,y in curve_points)}]")
+    dss.Text.Command(f"~ yarray=[{','.join(str(y) for x,y in curve_points)}]")
+    
+    # Create InvControl
+    dss.Text.Command(f"New InvControl.{pv_name}_ctrl")
+    dss.Text.Command(f"~ DERList=[{pv_name}]")
+    dss.Text.Command(f"~ Mode=VOLTVAR")
+    dss.Text.Command(f"~ voltage_curvex_ref={pv_name}_vvc")
+    dss.Text.Command(f"~ VVC_RefReactivePower=VARAVAL")
+
+# Example curve data in data/control_curves/ieee1547.json
+{
+  "name": "IEEE1547",
+  "description": "IEEE 1547-2018 Category B volt-var curve",
+  "points": [
+    [0.92, 0.44],
+    [0.98, 0.0],
+    [1.02, 0.0],
+    [1.08, -0.44]
+  ]
+}
+```
+
+---
+
+### 4. check_voltage_violations
+**Priority:** Phase 3 (Day 2)
+**Purpose:** Identify buses exceeding voltage limits
+
+```python
+def check_voltage_violations(
+    min_voltage_pu: float = 0.95,
+    max_voltage_pu: float = 1.05,
+    phase: str | None = None
+) -> dict[str, Any]:
+    """Check all bus voltages against limits."""
+    # Get all bus voltages
+    # Compare against limits
+    # Classify by severity (minor/moderate/severe)
+    # Return violations list
+```
+
+---
+
+### 5. analyze_feeder_capacity
+**Priority:** Phase 3 (Day 2)
+**Purpose:** Determine maximum DER hosting capacity
+
+```python
+def analyze_feeder_capacity(
+    bus_id: str,
+    der_type: str = "solar",
+    increment_kw: float = 100,
+    max_capacity_kw: float = 10000,
+    constraints: dict | None = None
+) -> dict[str, Any]:
+    """Determine max DER capacity before limit violations.
+    
+    Algorithm:
+    1. Start at 0 kW
+    2. Increment by step size
+    3. Run power flow at each step
+    4. Check voltage and thermal constraints
+    5. Stop at first violation
+    """
+    capacity = 0.0
+    results = []
+    
+    while capacity <= max_capacity_kw:
+        # Add DER at current capacity
+        # Run power flow
+        # Check constraints
+        if violation_detected:
+            break
+        
+        capacity += increment_kw
+        
+    return max_capacity_found
+```
+
+---
+
+### 6. run_time_series_simulation
+**Priority:** Phase 4 (Day 3)
+**Purpose:** Multi-timestep simulation with profiles
+
+```python
+def run_time_series_simulation(
+    load_profile: str | dict,
+    generation_profile: str | dict | None = None,
+    duration_hours: int = 24,
+    timestep_minutes: int = 60,
+    output_variables: list[str] | None = None
+) -> dict[str, Any]:
+    """Run time-series simulation over specified duration.
+    
+    Built-in load profiles:
+        - "residential_summer"
+        - "commercial_weekday"
+        - "industrial_constant"
+    
+    Built-in generation profiles:
+        - "solar_clear_day"
+        - "solar_cloudy_day"
+    """
+    # Load profile data
+    # For each timestep:
+    #   - Update loads
+    #   - Update generation
+    #   - Run power flow
+    #   - Collect results
+    # Calculate summary statistics
+```
+
+**Profile Format:**
+```python
+# data/load_profiles/residential_summer.json
+{
+  "name": "residential_summer",
+  "timestep_minutes": 60,
+  "values": [0.4, 0.35, 0.3, 0.3, 0.35, 0.45, ...]  # 24 hourly multipliers
+}
+```
+
+---
+
+### 7. generate_visualization
+**Priority:** Phase 4 (Day 3)
+**Purpose:** Create plots and diagrams
+
+```python
+def generate_visualization(
+    plot_type: str,
+    data_source: str = "last_power_flow",
+    options: dict | None = None
+) -> dict[str, Any]:
+    """Generate plots for analysis results.
+    
+    Supported plot types:
+        - "voltage_profile": Bar chart of bus voltages
+        - "network_diagram": Topology with networkx
+        - "timeseries": Line plots over time
+        - "capacity_curve": Hosting capacity curve
+        - "harmonics_spectrum": Harmonic magnitudes bar chart
+    """
+    # Retrieve data from last tool call
+    # Create matplotlib figure
+    # Save to file or convert to base64
+    # Return path or encoded image
+```
+
+---
+
+## Testing Requirements
+
+### Unit Tests
+```python
+# tests/test_power_flow.py
+import pytest
+from opendss_mcp.tools.power_flow import run_power_flow
+from opendss_mcp.tools.feeder_loader import load_ieee_test_feeder
+
+def test_power_flow_basic():
+    """Test basic power flow execution."""
+    # Load feeder
+    load_result = load_ieee_test_feeder("IEEE13")
+    assert load_result["success"]
+    
+    # Run power flow
+    result = run_power_flow(solve_mode="snap")
+    
+    assert result["success"]
+    assert result["data"]["converged"]
+    assert "voltages" in result["data"]
+    assert len(result["data"]["voltages"]) > 0
+    
+def test_power_flow_with_harmonics():
+    """Test power flow with harmonics analysis."""
+    load_ieee_test_feeder("IEEE13")
+    
+    result = run_power_flow(
+        harmonic_analysis=True,
+        harmonic_orders=[3, 5, 7]
+    )
+    
+    assert result["success"]
+    assert result["data"]["harmonics"] is not None
+    assert "thd_voltage" in result["data"]["harmonics"]
+```
+
+### Integration Tests
+```python
+# tests/test_integration.py
+def test_full_der_study_workflow():
+    """Test complete DER integration study."""
+    # 1. Load feeder
+    load_result = load_ieee_test_feeder("IEEE123")
+    assert load_result["success"]
+    
+    # 2. Run baseline power flow
+    baseline = run_power_flow()
+    assert baseline["success"]
+    baseline_losses = baseline["data"]["total_losses_kw"]
+    
+    # 3. Check voltage violations
+    violations = check_voltage_violations()
+    baseline_violations = violations["data"]["num_violations"]
+    
+    # 4. Optimize DER placement
+    der_result = optimize_der_placement(
+        der_type="solar_vvc",
+        capacity_kw=2000,
+        objective="minimize_losses"
+    )
+    assert der_result["success"]
+    optimal_bus = der_result["data"]["optimal_bus"]
+    
+    # 5. Verify improvement
+    improvement = der_result["data"]["improvement_metrics"]
+    assert improvement["loss_reduction_pct"] > 0
+```
+
+### Performance Tests
+```python
+# tests/test_performance.py
+import time
+
+def test_power_flow_performance():
+    """Verify power flow completes in <5 seconds."""
+    load_ieee_test_feeder("IEEE123")
+    
+    start = time.time()
+    result = run_power_flow()
+    elapsed = time.time() - start
+    
+    assert result["success"]
+    assert elapsed < 5.0, f"Power flow took {elapsed:.2f}s (target: <5s)"
+```
+
+---
+
+## Development Workflow
+
+### Phase-by-Phase Approach
+1. **Foundation First:** Get DSS wrapper and feeder loading working before MCP
+2. **Test Early:** Write tests alongside each tool
+3. **Validate Results:** Compare with manual OpenDSS calculations
+4. **Document as You Go:** Update docs with each feature
+
+### Commit Messages
+```bash
+# Feature commits
+git commit -m "feat: implement IEEE feeder loader tool"
+git commit -m "feat: add harmonics analysis to power flow"
+
+# Fix commits  
+git commit -m "fix: voltage violation checker phase handling"
+
+# Documentation
+git commit -m "docs: add user guide for DER optimization"
+
+# Tests
+git commit -m "test: add integration tests for time-series"
+```
+
+---
+
+## Common Patterns
+
+### Input Validation
+```python
+# utils/validators.py
+def validate_bus_id(bus_id: str) -> None:
+    """Validate bus ID exists in current circuit."""
+    if not dss.Circuit.Name():
+        raise ValueError("No circuit loaded")
+    
+    all_buses = dss.Circuit.AllBusNames()
+    if bus_id not in all_buses:
+        available = ", ".join(all_buses[:5])
+        raise ValueError(
+            f"Bus '{bus_id}' not found. "
+            f"Available buses: {available}..."
+        )
+
+def validate_positive_float(value: float, name: str) -> None:
+    """Validate parameter is positive."""
+    if value <= 0:
+        raise ValueError(f"{name} must be positive, got {value}")
+```
+
+### Result Formatting
+```python
+# utils/formatters.py
+def format_voltage_data(voltages: dict[str, float]) -> dict:
+    """Format voltage results for MCP response."""
+    return {
+        "voltages": voltages,
+        "min_voltage_pu": min(voltages.values()),
+        "max_voltage_pu": max(voltages.values()),
+        "min_voltage_bus": min(voltages, key=voltages.get),
+        "max_voltage_bus": max(voltages, key=voltages.get),
+        "avg_voltage_pu": sum(voltages.values()) / len(voltages)
+    }
+```
+
+---
+
+## Critical Rules
+
+### ALWAYS
+- ✅ Return structured JSON responses with success/data/errors
+- ✅ Validate inputs before OpenDSS operations
+- ✅ Use type hints on all functions
+- ✅ Write docstrings in Google style
+- ✅ Test each tool independently
+- ✅ Handle OpenDSS errors gracefully
+- ✅ Log important operations
+- ✅ Keep functions focused (single responsibility)
+
+### NEVER
+- ❌ Raise exceptions to MCP layer (return error dicts)
+- ❌ Assume OpenDSS state persists
+- ❌ Use magic numbers (define constants)
+- ❌ Skip input validation
+- ❌ Leave TODO comments (fix immediately or create issue)
+- ❌ Commit untested code
+- ❌ Hard-code file paths (use pathlib)
+
+---
+
+## Quick Reference Commands
+
+```bash
+# Setup
+pip install -e .
+pip install -e ".[dev]"
+
+# Testing
+pytest                          # Run all tests
+pytest -v                       # Verbose
+pytest --cov=src/opendss_mcp   # With coverage
+pytest tests/test_power_flow.py # Single file
+
+# Code Quality
+black src/ tests/              # Format
+pylint src/opendss_mcp        # Lint
+mypy src/opendss_mcp          # Type check
+
+# Running
+python -m opendss_mcp.server  # Start MCP server
+
+# Building
+python -m build               # Build package
+twine check dist/*            # Validate
+```
+
+---
+
+## Success Criteria
+
+Before marking any tool "complete":
+- ✅ Function works with all 3 IEEE feeders
+- ✅ Unit tests pass with >80% coverage
+- ✅ Integration test demonstrates workflow
+- ✅ Performance meets targets (<5s power flow)
+- ✅ Error cases handled gracefully
+- ✅ Documentation complete (docstrings + examples)
+- ✅ Results match manual OpenDSS verification
+
+---
+
+## When Stuck
+
+1. **OpenDSS errors:** Check dss.Text.Result() for error messages
+2. **MCP issues:** Test tool function directly before MCP integration
+3. **Performance:** Profile with cProfile, optimize hot paths
+4. **Tests failing:** Add print statements, use pytest -s for output
+5. **Unclear spec:** Refer to PRD artifact for detailed requirements
+
+---
+
+## Next Steps
+
+Start with Phase 1:
+1. Create project structure
+2. Set up pyproject.toml
+3. Implement DSS wrapper utility
+4. Download IEEE feeder files
+5. Test basic feeder loading
+
+Then proceed tool-by-tool following the PRD phases.
+
+Remember: **Test early, test often, document as you go.**
