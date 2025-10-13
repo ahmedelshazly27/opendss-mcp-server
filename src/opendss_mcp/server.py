@@ -15,6 +15,7 @@ from mcp.server import Server
 # Local imports
 from .tools.feeder_loader import load_ieee_test_feeder
 from .tools.power_flow import run_power_flow
+from .tools.voltage_checker import check_voltage_violations
 
 # Configure logging
 logging.basicConfig(
@@ -89,15 +90,56 @@ def run_power_flow_analysis(
     try:
         logger.info(f"Running power flow for feeder: {feeder_id}")
         result = run_power_flow(feeder_id, options or {})
-        
+
         if not result.get('success', False):
             error_msg = result.get('errors', ['Unknown error running power flow'])
             logger.error(f"Power flow failed for {feeder_id}: {error_msg}")
-            
+
         return result
-        
+
     except Exception as e:
         error_msg = f"Error running power flow for {feeder_id}: {str(e)}"
+        logger.exception(error_msg)
+        return {
+            'success': False,
+            'data': None,
+            'metadata': None,
+            'errors': [error_msg]
+        }
+
+
+@server.tool()
+def check_voltages(
+    min_voltage_pu: float = 0.95,
+    max_voltage_pu: float = 1.05,
+    phase: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Check all bus voltages against specified limits and identify violations.
+
+    Args:
+        min_voltage_pu: Minimum acceptable voltage in per-unit (default: 0.95)
+        max_voltage_pu: Maximum acceptable voltage in per-unit (default: 1.05)
+        phase: Optional phase filter ('1', '2', '3', or None for all phases)
+
+    Returns:
+        Dictionary containing violations list, summary statistics, and metadata
+    """
+    try:
+        logger.info(f"Checking voltage violations with limits [{min_voltage_pu}, {max_voltage_pu}] pu")
+        result = check_voltage_violations(min_voltage_pu, max_voltage_pu, phase)
+
+        if not result.get('success', False):
+            error_msg = result.get('errors', ['Unknown error checking voltages'])
+            logger.error(f"Voltage check failed: {error_msg}")
+        else:
+            num_violations = result.get('data', {}).get('summary', {}).get('total_violations', 0)
+            logger.info(f"Found {num_violations} voltage violations")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Error checking voltage violations: {str(e)}"
         logger.exception(error_msg)
         return {
             'success': False,
