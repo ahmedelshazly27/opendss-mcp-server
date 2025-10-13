@@ -16,6 +16,7 @@ from mcp.server import Server
 from .tools.feeder_loader import load_ieee_test_feeder
 from .tools.power_flow import run_power_flow
 from .tools.voltage_checker import check_voltage_violations
+from .tools.capacity import analyze_feeder_capacity
 
 # Configure logging
 logging.basicConfig(
@@ -140,6 +141,52 @@ def check_voltages(
 
     except Exception as e:
         error_msg = f"Error checking voltage violations: {str(e)}"
+        logger.exception(error_msg)
+        return {
+            'success': False,
+            'data': None,
+            'metadata': None,
+            'errors': [error_msg]
+        }
+
+
+@server.tool()
+def analyze_capacity(
+    bus_id: str,
+    der_type: str = "solar",
+    increment_kw: float = 100,
+    max_capacity_kw: float = 10000,
+    constraints: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Analyze maximum DER hosting capacity at a specific bus.
+
+    Args:
+        bus_id: Identifier of the bus where DER will be connected
+        der_type: Type of DER ("solar", "battery", "wind") - default: "solar"
+        increment_kw: Capacity increment for each iteration in kW (default: 100)
+        max_capacity_kw: Maximum capacity to test in kW (default: 10000)
+        constraints: Optional constraint limits (min_voltage_pu, max_voltage_pu, max_line_loading_pct)
+
+    Returns:
+        Dictionary containing capacity analysis results with max capacity, limiting constraint, and capacity curve
+    """
+    try:
+        logger.info(f"Analyzing capacity at bus {bus_id} for {der_type} DER")
+        result = analyze_feeder_capacity(bus_id, der_type, increment_kw, max_capacity_kw, constraints or {})
+
+        if not result.get('success', False):
+            error_msg = result.get('errors', ['Unknown error analyzing capacity'])
+            logger.error(f"Capacity analysis failed: {error_msg}")
+        else:
+            max_capacity = result.get('data', {}).get('max_capacity_kw', 0)
+            limiting = result.get('data', {}).get('limiting_constraint', 'none')
+            logger.info(f"Max capacity: {max_capacity} kW, limited by: {limiting}")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Error analyzing feeder capacity: {str(e)}"
         logger.exception(error_msg)
         return {
             'success': False,
