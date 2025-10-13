@@ -31,7 +31,7 @@ class DSSCircuit:
         try:
             # Initialize OpenDSS
             if not dss.Basic.NumCircuits() > 0:
-                dss.run_command("Clear")
+                dss.Text.Command("Clear")
             self._initialized = True
         except Exception as e:
             logger.error(f"Failed to initialize OpenDSS: {e}")
@@ -62,7 +62,7 @@ class DSSCircuit:
             bool: True if file was loaded successfully, False otherwise.
         """
         try:
-            dss.run_command(f"compile {file_path}")
+            dss.Text.Command(f"compile {file_path}")
             self.dss_file_path = file_path
             self.current_feeder = file_path.stem if hasattr(file_path, 'stem') else file_path.split('/')[-1].split('.')[0]
             return True

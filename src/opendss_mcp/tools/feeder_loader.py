@@ -1,10 +1,11 @@
 """
 Feeder loading functionality for OpenDSS MCP.
 
-This module provides tools to load and analyze IEEE test feeders, including
-metadata collection and basic circuit analysis.
+This module provides tools to load and analyze official IEEE test feeders,
+including metadata collection and basic circuit analysis.
 """
 
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -16,6 +17,22 @@ from ..utils.formatters import format_success_response, format_error_response
 
 # Path to the IEEE feeders directory
 FEEDERS_DIR = Path(__file__).parent.parent / "data" / "ieee_feeders"
+
+# Mapping of feeder IDs to their respective file names and base directories
+FEEDER_CONFIG = {
+    "IEEE13": {
+        "file": "IEEE13.dss",
+        "base_dir": ""
+    },
+    "IEEE34": {
+        "file": "IEEE34.dss",
+        "base_dir": ""
+    },
+    "IEEE123": {
+        "file": "IEEE123.dss",
+        "base_dir": ""
+    }
+}
 
 
 def _calculate_total_line_length() -> float:
@@ -161,16 +178,37 @@ def load_ieee_test_feeder(
         # Initialize DSS circuit
         dss_circuit = DSSCircuit()
         
-        # Build path to the feeder file
-        feeder_file = FEEDERS_DIR / f"{feeder_id}.dss"
+        # Get the feeder configuration
+        if feeder_id not in FEEDER_CONFIG:
+            return format_error_response(f"Unsupported feeder ID: {feeder_id}")
+            
+        config = FEEDER_CONFIG[feeder_id]
+
+        # Build feeder path - handle empty base_dir
+        if config["base_dir"]:
+            feeder_dir = FEEDERS_DIR / config["base_dir"]
+        else:
+            feeder_dir = FEEDERS_DIR
+
+        feeder_file = feeder_dir / config["file"]
+
         if not feeder_file.exists():
             return format_error_response(f"Feeder file not found: {feeder_file}")
-        
+
         # Clear any existing circuit
         dss.Text.Command('Clear')
-        
-        # Load the feeder file
-        dss.Text.Command(f'compile [{feeder_file}]')
+
+        # Change to the feeder directory to handle relative paths in DSS files
+        current_dir = Path.cwd()
+        try:
+            os.chdir(feeder_dir)
+            # Load the feeder file with full path to ensure it's found
+            dss.Text.Command(f'compile [{feeder_file.absolute()}]')
+        except Exception as e:
+            return format_error_response(f"Error loading feeder {feeder_id}: {str(e)}")
+        finally:
+            # Always restore the original directory
+            os.chdir(current_dir)
         
         # Apply any modifications if provided
         if modifications:
