@@ -17,6 +17,7 @@ from .tools.feeder_loader import load_ieee_test_feeder
 from .tools.power_flow import run_power_flow
 from .tools.voltage_checker import check_voltage_violations
 from .tools.capacity import analyze_feeder_capacity
+from .tools.der_optimizer import optimize_der_placement
 
 # Configure logging
 logging.basicConfig(
@@ -187,6 +188,57 @@ def analyze_capacity(
 
     except Exception as e:
         error_msg = f"Error analyzing feeder capacity: {str(e)}"
+        logger.exception(error_msg)
+        return {
+            'success': False,
+            'data': None,
+            'metadata': None,
+            'errors': [error_msg]
+        }
+
+
+@server.tool()
+def optimize_der(
+    der_type: str,
+    capacity_kw: float,
+    battery_kwh: Optional[float] = None,
+    objective: str = "minimize_losses",
+    candidate_buses: Optional[list] = None,
+    constraints: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Optimize DER placement to achieve specified objective.
+
+    Args:
+        der_type: Type of DER ("solar", "battery", "solar_battery", "ev_charger", "wind")
+        capacity_kw: DER capacity in kW
+        battery_kwh: Battery energy capacity in kWh (optional)
+        objective: Optimization objective ("minimize_losses", "maximize_capacity", "minimize_violations")
+        candidate_buses: List of bus IDs to evaluate (None = all buses, limited to 20)
+        constraints: Optional constraint limits (min_voltage_pu, max_voltage_pu, max_candidates)
+
+    Returns:
+        Dictionary containing optimal bus, improvement metrics, and comparison table
+    """
+    try:
+        logger.info(f"Optimizing {der_type} DER placement ({capacity_kw} kW) with objective: {objective}")
+        result = optimize_der_placement(
+            der_type, capacity_kw, battery_kwh, objective,
+            candidate_buses, constraints or {}
+        )
+
+        if not result.get('success', False):
+            error_msg = result.get('errors', ['Unknown error optimizing DER placement'])
+            logger.error(f"DER optimization failed: {error_msg}")
+        else:
+            optimal_bus = result.get('data', {}).get('optimal_bus', 'unknown')
+            improvement = result.get('data', {}).get('improvement_metrics', {})
+            logger.info(f"Optimal bus: {optimal_bus}, Loss reduction: {improvement.get('loss_reduction_kw', 0)} kW")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Error optimizing DER placement: {str(e)}"
         logger.exception(error_msg)
         return {
             'success': False,
