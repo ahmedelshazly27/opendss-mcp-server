@@ -719,7 +719,7 @@ SOFTWARE.
 
 ## Roadmap
 
-### Version 1.1 (Planned Q1 2025)
+### Version 1.1 (Planned Q1 2026)
 
 - [ ] Additional IEEE test feeders (8500-node, European LV)
 - [ ] Protection coordination analysis
@@ -727,7 +727,7 @@ SOFTWARE.
 - [ ] Reliability indices (SAIDI, SAIFI)
 - [ ] Multi-feeder optimization
 
-### Version 1.2 (Planned Q2 2025)
+### Version 1.2 (Planned Q2 2026)
 
 - [ ] Real-time SCADA integration
 - [ ] Battery energy storage optimization
@@ -735,7 +735,7 @@ SOFTWARE.
 - [ ] Demand response modeling
 - [ ] Microgrids and islanding analysis
 
-### Version 2.0 (Planned Q3 2025)
+### Version 2.0 (Planned Q3 2026)
 
 - [ ] REST API for web applications
 - [ ] Dashboard and web UI
