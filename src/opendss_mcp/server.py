@@ -18,6 +18,7 @@ from .tools.power_flow import run_power_flow
 from .tools.voltage_checker import check_voltage_violations
 from .tools.capacity import analyze_feeder_capacity
 from .tools.der_optimizer import optimize_der_placement
+from .tools.visualization import generate_visualization
 
 # Configure logging
 logging.basicConfig(
@@ -239,6 +240,64 @@ def optimize_der(
 
     except Exception as e:
         error_msg = f"Error optimizing DER placement: {str(e)}"
+        logger.exception(error_msg)
+        return {
+            'success': False,
+            'data': None,
+            'metadata': None,
+            'errors': [error_msg]
+        }
+
+
+@server.tool()
+def create_visualization(
+    plot_type: str,
+    data_source: str = "last_power_flow",
+    options: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Generate visualizations for power system analysis results.
+
+    Args:
+        plot_type: Type of plot to generate:
+            - "voltage_profile": Bar chart of bus voltages
+            - "network_diagram": Network topology with networkx
+            - "timeseries": Line plots of variables over time
+            - "capacity_curve": Scatter plot for capacity analysis
+            - "harmonics_spectrum": Bar chart of harmonic magnitudes
+        data_source: Source of data to plot (default: "last_power_flow"):
+            - "last_power_flow": Use most recent power flow results
+            - "last_timeseries": Use most recent time-series simulation
+            - "last_capacity": Use most recent capacity analysis
+            - "last_harmonics": Use most recent harmonics analysis
+            - "circuit": Query current OpenDSS circuit state
+        options: Optional plot customization options:
+            - save_path: Path to save plot file (if None, returns base64)
+            - figsize: Tuple of (width, height) in inches
+            - title: Custom plot title
+            - show_violations: Highlight voltage violations (default: True)
+            - bus_filter: List of buses to include (None = all)
+
+    Returns:
+        Dictionary containing visualization results with plot data or file path
+    """
+    try:
+        logger.info(f"Creating {plot_type} visualization from {data_source}")
+        result = generate_visualization(plot_type, data_source, options or {})
+
+        if not result.get('success', False):
+            error_msg = result.get('errors', ['Unknown error creating visualization'])
+            logger.error(f"Visualization failed: {error_msg}")
+        else:
+            if result.get('data', {}).get('file_path'):
+                logger.info(f"Visualization saved to: {result['data']['file_path']}")
+            else:
+                logger.info("Visualization created as base64 image")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Error creating visualization: {str(e)}"
         logger.exception(error_msg)
         return {
             'success': False,
