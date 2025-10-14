@@ -1,0 +1,22 @@
+{
+  "name": "RULE21",
+  "description": "California Rule 21 volt-var curve",
+  "type": "volt-var",
+  "points": [
+    [0.95, 0.44],
+    [0.99, 0.0],
+    [1.01, 0.0],
+    [1.05, -0.44]
+  ],
+  "units": {
+    "voltage": "per-unit",
+    "var": "per-unit (of rated kVA)"
+  },
+  "notes": [
+    "California Rule 21 default volt-var curve",
+    "Voltage range: 0.95 - 1.05 pu",
+    "Reactive power range: -0.44 to +0.44 pu (44% of rated kVA)",
+    "Positive values = absorb vars (inductive), negative = inject vars (capacitive)",
+    "Tighter deadband than IEEE 1547 for better voltage regulation"
+  ]
+}

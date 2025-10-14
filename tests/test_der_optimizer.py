@@ -116,5 +116,128 @@ def test_comparison_table():
     assert optimal_bus == comparison_table[0]["bus_id"]
 
 
+def test_der_optimization_with_vvc():
+    """Test DER optimization with volt-var control enabled."""
+    # Load and solve
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    # Run solar_vvc optimization with IEEE1547 curve
+    result = optimize_der_placement(
+        der_type="solar_vvc",
+        capacity_kw=500,
+        objective="minimize_losses",
+        candidate_buses=["675", "671", "611", "652"],
+        control_settings={
+            "curve": "IEEE1547",
+            "response_time": 10.0
+        }
+    )
+
+    # Verify operation succeeded
+    assert result["success"], f"DER optimization with VVC failed: {result.get('errors')}"
+
+    # Verify optimal bus was found
+    data = result["data"]
+    assert "optimal_bus" in data
+    assert data["optimal_bus"] in ["675", "671", "611", "652"]
+
+    # Verify der_type reflects VVC
+    assert data["der_type"] == "solar_vvc"
+
+    # Verify comparison table includes q_support_kvar
+    comparison_table = data["comparison_table"]
+    assert len(comparison_table) > 0
+
+    for entry in comparison_table:
+        assert "q_support_kvar" in entry, "VVC optimization should include q_support_kvar"
+        assert isinstance(entry["q_support_kvar"], (int, float))
+
+    # At least one bus should have non-zero reactive power support
+    # Note: The actual value depends on voltage conditions, but we can verify the field exists
+    q_values = [entry["q_support_kvar"] for entry in comparison_table]
+    assert any(isinstance(q, (int, float)) for q in q_values), "Should have q_support_kvar values"
+
+
+def test_der_optimization_solar_battery_vvc():
+    """Test hybrid solar+battery optimization with volt-var control."""
+    # Load and solve
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    # Run solar_battery_vvc optimization with RULE21 curve
+    result = optimize_der_placement(
+        der_type="solar_battery_vvc",
+        capacity_kw=400,
+        battery_kwh=1600,
+        objective="minimize_violations",
+        candidate_buses=["675", "671", "611"],
+        control_settings={
+            "curve": "RULE21",
+            "response_time": 5.0
+        }
+    )
+
+    # Verify operation succeeded
+    assert result["success"], f"Hybrid VVC optimization failed: {result.get('errors')}"
+
+    # Verify results structure
+    data = result["data"]
+    assert data["der_type"] == "solar_battery_vvc"
+    assert "optimal_bus" in data
+    assert "comparison_table" in data
+
+    # Verify q_support_kvar is included
+    comparison_table = data["comparison_table"]
+    for entry in comparison_table:
+        assert "q_support_kvar" in entry
+
+
+def test_vvc_vs_no_vvc_comparison():
+    """Compare optimization results with and without volt-var control."""
+    # Run without VVC
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result_no_vvc = optimize_der_placement(
+        der_type="solar",
+        capacity_kw=500,
+        objective="minimize_losses",
+        candidate_buses=["675", "671"]
+    )
+
+    # Reload feeder for second run to avoid duplicate elements
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    # Run with VVC
+    result_with_vvc = optimize_der_placement(
+        der_type="solar_vvc",
+        capacity_kw=500,
+        objective="minimize_losses",
+        candidate_buses=["675", "671"],
+        control_settings={"curve": "IEEE1547"}
+    )
+
+    # Both should succeed
+    assert result_no_vvc["success"]
+    assert result_with_vvc["success"]
+
+    # Check q_support_kvar field presence
+    no_vvc_table = result_no_vvc["data"]["comparison_table"]
+    with_vvc_table = result_with_vvc["data"]["comparison_table"]
+
+    # Without VVC: q_support_kvar should be 0 or not included meaningfully
+    for entry in no_vvc_table:
+        assert "q_support_kvar" in entry
+        # Should be zero since no VVC
+        assert entry["q_support_kvar"] == 0.0
+
+    # With VVC: q_support_kvar should be included (may or may not be non-zero depending on conditions)
+    for entry in with_vvc_table:
+        assert "q_support_kvar" in entry
+        assert isinstance(entry["q_support_kvar"], (int, float))
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

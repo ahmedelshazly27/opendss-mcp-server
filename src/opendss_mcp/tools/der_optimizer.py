@@ -13,12 +13,16 @@ import opendssdirect as dss
 
 from ..utils.formatters import format_success_response, format_error_response
 from ..utils.validators import validate_positive_float
+from ..utils.inverter_control import load_curve, configure_volt_var_control
 from .voltage_checker import check_voltage_violations
 
 logger = logging.getLogger(__name__)
 
 # Supported DER types
-SUPPORTED_DER_TYPES = ["solar", "battery", "solar_battery", "ev_charger", "wind"]
+SUPPORTED_DER_TYPES = [
+    "solar", "battery", "solar_battery", "ev_charger", "wind",
+    "solar_vvc", "solar_battery_vvc"  # Volt-var control enabled variants
+]
 
 # Supported optimization objectives
 SUPPORTED_OBJECTIVES = ["minimize_losses", "maximize_capacity", "minimize_violations"]
@@ -38,14 +42,79 @@ def _get_total_losses() -> float:
         return 0.0
 
 
-def _add_der_at_bus(bus_id: str, der_type: str, capacity_kw: float, battery_kwh: Optional[float] = None) -> bool:
-    """Add a DER to the specified bus.
+def _get_der_reactive_power(bus_id: str, der_type: str) -> float:
+    """Get reactive power output from DER at specified bus.
 
     Args:
         bus_id: Bus identifier
         der_type: Type of DER
+
+    Returns:
+        Reactive power in kvar (positive = absorbing, negative = injecting)
+    """
+    try:
+        der_name = f"der_opt_{bus_id}"
+        base_type = der_type.replace("_vvc", "")
+
+        # Determine element name based on type
+        if base_type in ["solar", "wind"]:
+            if base_type == "solar":
+                element_name = f"PVSystem.{der_name}"
+            else:
+                element_name = f"Generator.{der_name}"
+
+            # Set active element
+            result = dss.Circuit.SetActiveElement(element_name)
+            if result < 0:
+                return 0.0
+
+            # Get powers: [P1, Q1, P2, Q2, ...] for each terminal
+            powers = dss.CktElement.Powers()
+            if len(powers) >= 2:
+                # Sum reactive power across all phases (odd indices)
+                q_kvar = sum(powers[i] for i in range(1, len(powers), 2))
+                return q_kvar
+            return 0.0
+
+        elif base_type == "solar_battery":
+            # Get reactive power from PV component only
+            element_name = f"PVSystem.{der_name}_pv"
+            result = dss.Circuit.SetActiveElement(element_name)
+            if result < 0:
+                return 0.0
+
+            powers = dss.CktElement.Powers()
+            if len(powers) >= 2:
+                q_kvar = sum(powers[i] for i in range(1, len(powers), 2))
+                return q_kvar
+            return 0.0
+
+        else:
+            # Battery, EV charger don't typically provide reactive power in this model
+            return 0.0
+
+    except Exception as e:
+        logger.error(f"Error getting reactive power for {bus_id}: {e}")
+        return 0.0
+
+
+def _add_der_at_bus(
+    bus_id: str,
+    der_type: str,
+    capacity_kw: float,
+    battery_kwh: Optional[float] = None,
+    control_settings: Optional[Dict[str, Any]] = None
+) -> bool:
+    """Add a DER to the specified bus with optional volt-var control.
+
+    Args:
+        bus_id: Bus identifier
+        der_type: Type of DER (supports "_vvc" suffix for volt-var control)
         capacity_kw: DER capacity in kW
         battery_kwh: Battery energy capacity in kWh (for battery types)
+        control_settings: Optional control settings:
+            - curve: Curve name ("IEEE1547", "RULE21") or path to JSON file
+            - response_time: Response time in seconds (default: 10.0)
 
     Returns:
         bool: True if DER was added successfully
@@ -59,35 +128,61 @@ def _add_der_at_bus(bus_id: str, der_type: str, capacity_kw: float, battery_kwh:
             logger.error(f"Bus {bus_id} has zero voltage base")
             return False
 
+        # Parse DER type and check for volt-var control
+        base_type = der_type.replace("_vvc", "")
+        has_vvc = "_vvc" in der_type
+
         # Create unique DER name
         der_name = f"der_opt_{bus_id}"
 
-        if der_type == "solar":
+        # Add DER based on base type
+        if base_type == "solar":
             # Add PV system
             dss.Text.Command(f"New PVSystem.{der_name} Bus1={bus_id} kV={kv_base} kVA={capacity_kw} Pmpp={capacity_kw} irradiance=1.0")
 
-        elif der_type == "battery":
+        elif base_type == "battery":
             # Add battery storage
             kwh = battery_kwh if battery_kwh else capacity_kw * 4  # Default 4-hour storage
             dss.Text.Command(f"New Storage.{der_name} Bus1={bus_id} kV={kv_base} kWrated={capacity_kw} kWhrated={kwh} %stored=50 %discharge=50")
 
-        elif der_type == "solar_battery":
+        elif base_type == "solar_battery":
             # Add both PV and storage
             dss.Text.Command(f"New PVSystem.{der_name}_pv Bus1={bus_id} kV={kv_base} kVA={capacity_kw} Pmpp={capacity_kw} irradiance=1.0")
             kwh = battery_kwh if battery_kwh else capacity_kw * 2  # Default 2-hour for hybrid
             dss.Text.Command(f"New Storage.{der_name}_batt Bus1={bus_id} kV={kv_base} kWrated={capacity_kw * 0.5} kWhrated={kwh} %stored=50")
 
-        elif der_type == "ev_charger":
+        elif base_type == "ev_charger":
             # Add EV charger as load (negative for generation during V2G)
             dss.Text.Command(f"New Load.{der_name} Bus1={bus_id} kV={kv_base} kW={capacity_kw} PF=0.95")
 
-        elif der_type == "wind":
+        elif base_type == "wind":
             # Add wind generator
             dss.Text.Command(f"New Generator.{der_name} Bus1={bus_id} kV={kv_base} kW={capacity_kw} PF=0.95")
 
         else:
-            logger.error(f"Unsupported DER type: {der_type}")
+            logger.error(f"Unsupported DER type: {base_type}")
             return False
+
+        # Configure volt-var control if requested
+        if has_vvc and base_type in ["solar", "solar_battery"]:
+            control_settings = control_settings or {}
+            curve_name = control_settings.get("curve", "IEEE1547")
+            response_time = control_settings.get("response_time", 10.0)
+
+            try:
+                # Load curve
+                curve_points = load_curve(curve_name)
+
+                # Configure volt-var for PV system(s)
+                if base_type == "solar":
+                    configure_volt_var_control(der_name, curve_points, response_time)
+                elif base_type == "solar_battery":
+                    configure_volt_var_control(f"{der_name}_pv", curve_points, response_time)
+
+                logger.info(f"Configured volt-var control for {der_name} with {curve_name} curve")
+            except Exception as e:
+                logger.warning(f"Failed to configure volt-var control: {e}")
+                # Continue without control - don't fail the entire operation
 
         return True
 
@@ -166,15 +261,25 @@ def optimize_der_placement(
     constraints: Optional[Dict[str, Any]] = None,
     control_settings: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Optimize DER placement to achieve specified objective.
+    """Optimize DER placement to achieve specified objective with optional volt-var control.
 
     This function evaluates multiple candidate bus locations for DER placement
     and identifies the optimal location based on the specified objective function.
-    The analysis considers system losses, voltage profiles, and constraint violations.
+    The analysis considers system losses, voltage profiles, constraint violations,
+    and reactive power support (for volt-var enabled DERs).
 
     Args:
-        der_type: Type of DER to place - "solar", "battery", "solar_battery",
-                  "ev_charger", or "wind"
+        der_type: Type of DER to place. Options:
+            Without volt-var control:
+                - "solar": Solar PV system
+                - "battery": Battery storage
+                - "solar_battery": Hybrid solar + battery
+                - "ev_charger": EV charging station
+                - "wind": Wind generator
+            With volt-var control (append "_vvc"):
+                - "solar_vvc": Solar PV with autonomous volt-var control
+                - "solar_battery_vvc": Hybrid system with volt-var control
+
         capacity_kw: DER capacity in kW
         battery_kwh: Battery energy capacity in kWh (optional, defaults to 4x capacity_kw)
         objective: Optimization objective - "minimize_losses", "maximize_capacity",
@@ -184,16 +289,28 @@ def optimize_der_placement(
             - min_voltage_pu: Minimum voltage limit (default: 0.95)
             - max_voltage_pu: Maximum voltage limit (default: 1.05)
             - max_candidates: Maximum number of candidates to evaluate (default: 20)
-        control_settings: Optional control settings (reserved for future volt-var control)
+        control_settings: Optional volt-var control settings (for "_vvc" DER types):
+            - curve: Control curve name ("IEEE1547", "RULE21") or path to custom JSON
+            - response_time: Response time in seconds (default: 10.0)
 
     Returns:
         Dictionary containing:
             - success: Boolean indicating if the operation was successful
-            - data: Dictionary with optimization results
+            - data: Dictionary with optimization results:
+                - optimal_bus: Best bus location
+                - optimal_capacity_kw: DER capacity
+                - der_type: DER type used
+                - objective: Optimization objective
+                - improvement_metrics: Loss reduction, voltage improvements
+                - comparison_table: Top candidates with metrics including q_support_kvar
+                - baseline: Pre-DER system metrics
+                - constraints: Voltage and loading constraints used
+                - analysis_parameters: Number of candidates evaluated
             - metadata: Additional metadata about the optimization
             - errors: List of error messages if any occurred
 
     Example:
+        >>> # Basic solar optimization (no volt-var control)
         >>> result = optimize_der_placement(
         ...     der_type="solar",
         ...     capacity_kw=500,
@@ -203,6 +320,37 @@ def optimize_der_placement(
         ...     optimal_bus = result['data']['optimal_bus']
         ...     improvement = result['data']['improvement_metrics']['loss_reduction_kw']
         ...     print(f"Best location: {optimal_bus}, Loss reduction: {improvement} kW")
+        >>>
+        >>> # Solar with IEEE 1547 volt-var control
+        >>> result = optimize_der_placement(
+        ...     der_type="solar_vvc",
+        ...     capacity_kw=500,
+        ...     objective="minimize_violations",
+        ...     control_settings={
+        ...         "curve": "IEEE1547",
+        ...         "response_time": 10.0
+        ...     }
+        ... )
+        >>> if result['success']:
+        ...     comparison = result['data']['comparison_table']
+        ...     for entry in comparison[:3]:
+        ...         print(f"Bus {entry['bus_id']}: "
+        ...               f"Loss reduction: {entry['loss_reduction_kw']} kW, "
+        ...               f"Q support: {entry['q_support_kvar']} kvar")
+        >>>
+        >>> # Hybrid system with California Rule 21 control
+        >>> result = optimize_der_placement(
+        ...     der_type="solar_battery_vvc",
+        ...     capacity_kw=500,
+        ...     battery_kwh=2000,
+        ...     control_settings={"curve": "RULE21"}
+        ... )
+
+    Note:
+        - Volt-var control is only available for solar and solar_battery DER types
+        - Control curves are loaded from src/opendss_mcp/data/control_curves/
+        - Reactive power support (q_support_kvar) is included in results for VVC DERs
+        - Positive q_support = absorbing vars (inductive), negative = injecting vars (capacitive)
     """
     try:
         # Validate inputs
@@ -262,7 +410,7 @@ def optimize_der_placement(
         for bus_id in candidate_buses:
             try:
                 # Add DER at candidate bus
-                if not _add_der_at_bus(bus_id, der_type, capacity_kw, battery_kwh):
+                if not _add_der_at_bus(bus_id, der_type, capacity_kw, battery_kwh, control_settings):
                     logger.warning(f"Failed to add DER at bus {bus_id}, skipping")
                     continue
 
@@ -279,6 +427,9 @@ def optimize_der_placement(
                 voltage_check = check_voltage_violations(min_voltage_pu, max_voltage_pu)
                 num_violations = voltage_check.get("data", {}).get("summary", {}).get("total_violations", 0)
 
+                # Get reactive power support (for VVC-enabled DERs)
+                q_support_kvar = _get_der_reactive_power(bus_id, der_type) if "_vvc" in der_type else 0.0
+
                 # Calculate objective value
                 objective_value = _calculate_objective(objective, baseline_losses, current_losses, voltage_check)
 
@@ -289,6 +440,7 @@ def optimize_der_placement(
                     "losses_kw": round(current_losses, 2),
                     "loss_reduction_kw": round(baseline_losses - current_losses, 2),
                     "voltage_violations": num_violations,
+                    "q_support_kvar": round(q_support_kvar, 2),
                     "converged": True
                 })
 

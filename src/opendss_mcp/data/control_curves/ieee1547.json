@@ -1,0 +1,21 @@
+{
+  "name": "IEEE1547",
+  "description": "IEEE 1547-2018 Category B volt-var curve",
+  "type": "volt-var",
+  "points": [
+    [0.92, 0.44],
+    [0.98, 0.0],
+    [1.02, 0.0],
+    [1.08, -0.44]
+  ],
+  "units": {
+    "voltage": "per-unit",
+    "var": "per-unit (of rated kVA)"
+  },
+  "notes": [
+    "IEEE 1547-2018 Category B default volt-var curve",
+    "Voltage range: 0.92 - 1.08 pu",
+    "Reactive power range: -0.44 to +0.44 pu (44% of rated kVA)",
+    "Positive values = absorb vars (inductive), negative = inject vars (capacitive)"
+  ]
+}

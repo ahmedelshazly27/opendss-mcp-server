@@ -1,0 +1,44 @@
+{
+  "name": "CUSTOM_CURVE_NAME",
+  "description": "Description of your custom control curve",
+  "type": "volt-var",
+  "points": [
+    [0.95, 0.44],
+    [0.98, 0.22],
+    [1.00, 0.0],
+    [1.02, -0.22],
+    [1.05, -0.44]
+  ],
+  "units": {
+    "voltage": "per-unit",
+    "var": "per-unit (of rated kVA)"
+  },
+  "notes": [
+    "Template for creating custom volt-var control curves",
+    "Copy this file and modify the parameters below:",
+    "",
+    "REQUIRED FIELDS:",
+    "- name: Unique identifier for the curve (uppercase, no spaces)",
+    "- description: Human-readable description",
+    "- type: Currently only 'volt-var' is supported",
+    "- points: Array of [voltage, var] coordinate pairs",
+    "",
+    "POINTS FORMAT:",
+    "- Each point is [voltage_pu, var_pu]",
+    "- voltage_pu: Voltage in per-unit (typically 0.90 - 1.10)",
+    "- var_pu: Reactive power in per-unit of rated inverter kVA",
+    "- Positive vars = absorb (inductive, lagging)",
+    "- Negative vars = inject (capacitive, leading)",
+    "",
+    "GUIDELINES:",
+    "- Points must be sorted by voltage (ascending)",
+    "- Minimum 2 points required, 10 points maximum recommended",
+    "- Typical var range: -0.44 to +0.44 (per IEEE 1547)",
+    "- Include a deadband (zero var region) around 1.0 pu for stability",
+    "",
+    "EXAMPLE USE CASES:",
+    "- Voltage support: Inject vars at low voltage, absorb at high voltage",
+    "- Utility-specific curves: Match local interconnection requirements",
+    "- Research: Test custom control strategies"
+  ]
+}
