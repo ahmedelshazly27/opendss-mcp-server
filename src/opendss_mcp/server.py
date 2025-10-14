@@ -1,8 +1,10 @@
 """
-OpenDSS Modelica Connection Protocol (MCP) Server.
+OpenDSS Model Context Protocol (MCP) Server.
 
 This module implements an MCP server for OpenDSS power system simulations,
-providing tools for loading IEEE test feeders and running power flow analyses.
+providing comprehensive tools for distribution planning, DER integration analysis,
+and power quality assessment. Reduces distribution planning studies from weeks to minutes
+through conversational AI interaction.
 """
 
 import logging
@@ -12,12 +14,13 @@ from typing import Any, Dict, Optional
 # MCP SDK imports
 from mcp.server import Server
 
-# Local imports
+# Local imports - All 7 tools
 from .tools.feeder_loader import load_ieee_test_feeder
 from .tools.power_flow import run_power_flow
 from .tools.voltage_checker import check_voltage_violations
 from .tools.capacity import analyze_feeder_capacity
 from .tools.der_optimizer import optimize_der_placement
+from .tools.timeseries import run_time_series_simulation
 from .tools.visualization import generate_visualization
 
 # Configure logging
@@ -31,8 +34,7 @@ logger = logging.getLogger(__name__)
 # Initialize MCP server
 server = Server(
     name="opendss-mcp-server",
-    version="0.1.0",
-    description="OpenDSS Modelica Connection Protocol (MCP) Server"
+    version="1.0.0"
 )
 
 
@@ -250,36 +252,104 @@ def optimize_der(
 
 
 @server.tool()
+def run_timeseries(
+    load_profile: str | dict,
+    generation_profile: Optional[str | dict] = None,
+    duration_hours: int = 24,
+    timestep_minutes: int = 60,
+    output_variables: Optional[list] = None
+) -> Dict[str, Any]:
+    """
+    Run time-series power flow simulation with load and generation profiles.
+
+    Simulates the electrical system over time with varying loads and generation.
+    Useful for analyzing daily operations, renewable integration, and energy management.
+
+    Args:
+        load_profile: Load profile to apply. Either:
+            - String: Name of profile file (e.g., "residential_summer")
+            - Dict: Custom profile with "multipliers" key (list of scaling factors)
+        generation_profile: Optional generation profile (PV, wind, etc.):
+            - String: Name of profile file (e.g., "solar_clear_day")
+            - Dict: Custom profile with "multipliers" key
+            - None: No generation scaling
+        duration_hours: Simulation duration in hours (default: 24 for daily analysis)
+        timestep_minutes: Time step resolution in minutes (default: 60 for hourly)
+        output_variables: Variables to track (default: ["voltages", "losses", "loadings"]):
+            - "voltages": Bus voltages per timestep
+            - "losses": System losses per timestep
+            - "loadings": Line loading percentages
+            - "powers": Bus power injections
+
+    Returns:
+        Dictionary with time-series results, summary statistics, and convergence info
+    """
+    try:
+        logger.info(f"Running time-series simulation: {duration_hours}h at {timestep_minutes}min steps")
+        result = run_time_series_simulation(
+            load_profile=load_profile,
+            generation_profile=generation_profile,
+            duration_hours=duration_hours,
+            timestep_minutes=timestep_minutes,
+            output_variables=output_variables
+        )
+
+        if not result.get('success', False):
+            error_msg = result.get('errors', ['Unknown error in time-series simulation'])
+            logger.error(f"Time-series simulation failed: {error_msg}")
+        else:
+            num_steps = result.get('data', {}).get('summary', {}).get('num_timesteps', 0)
+            convergence_rate = result.get('data', {}).get('summary', {}).get('convergence_rate_pct', 0)
+            logger.info(f"Time-series complete: {num_steps} timesteps, {convergence_rate}% convergence")
+
+        return result
+
+    except Exception as e:
+        error_msg = f"Error in time-series simulation: {str(e)}"
+        logger.exception(error_msg)
+        return {
+            'success': False,
+            'data': None,
+            'metadata': None,
+            'errors': [error_msg]
+        }
+
+
+@server.tool()
 def create_visualization(
     plot_type: str,
     data_source: str = "last_power_flow",
     options: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Generate visualizations for power system analysis results.
+    Generate professional visualizations for power system analysis results.
+
+    Creates publication-quality plots for reports and presentations. Supports both
+    file export and base64 encoding for web applications.
 
     Args:
-        plot_type: Type of plot to generate:
-            - "voltage_profile": Bar chart of bus voltages
-            - "network_diagram": Network topology with networkx
-            - "timeseries": Line plots of variables over time
-            - "capacity_curve": Scatter plot for capacity analysis
-            - "harmonics_spectrum": Bar chart of harmonic magnitudes
-        data_source: Source of data to plot (default: "last_power_flow"):
+        plot_type: Type of visualization to generate:
+            - "voltage_profile": Bar chart showing bus voltages with violation highlighting
+            - "network_diagram": Network topology diagram with voltage-colored nodes
+            - "timeseries": Multi-panel line plots for time-varying data
+            - "capacity_curve": Scatter plot for DER hosting capacity analysis
+            - "harmonics_spectrum": Bar chart of harmonic voltage magnitudes
+        data_source: Source of data to visualize (default: "last_power_flow"):
+            - "circuit": Query current OpenDSS circuit state
             - "last_power_flow": Use most recent power flow results
             - "last_timeseries": Use most recent time-series simulation
             - "last_capacity": Use most recent capacity analysis
             - "last_harmonics": Use most recent harmonics analysis
-            - "circuit": Query current OpenDSS circuit state
-        options: Optional plot customization options:
-            - save_path: Path to save plot file (if None, returns base64)
-            - figsize: Tuple of (width, height) in inches
+        options: Plot customization options:
+            - save_path: Path to save file (if None, returns base64-encoded PNG)
+            - figsize: (width, height) in inches (e.g., (12, 6))
+            - dpi: Resolution in dots per inch (default: 100, use 300 for publication)
             - title: Custom plot title
-            - show_violations: Highlight voltage violations (default: True)
-            - bus_filter: List of buses to include (None = all)
+            - show_violations: Highlight voltage violations with colors (default: True)
+            - bus_filter: List of specific buses to include (None = all)
 
     Returns:
-        Dictionary containing visualization results with plot data or file path
+        Dictionary with visualization data (file path or base64 image) and metadata
     """
     try:
         logger.info(f"Creating {plot_type} visualization from {data_source}")
