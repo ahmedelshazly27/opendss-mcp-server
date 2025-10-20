@@ -6,10 +6,12 @@
 
 *Reduce distribution planning studies from weeks to minutes through natural language interaction*
 
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](tests/)
-[![Code Coverage](https://img.shields.io/badge/coverage-41%25-yellow.svg)](tests/)
+[![PyPI version](https://badge.fury.io/py/opendss-mcp-server.svg)](https://badge.fury.io/py/opendss-mcp-server)
+[![Tests](https://github.com/ahmedelshazly27/opendss-mcp-server/workflows/Tests/badge.svg)](https://github.com/ahmedelshazly27/opendss-mcp-server/actions/workflows/test.yml)
+[![Linting](https://github.com/ahmedelshazly27/opendss-mcp-server/workflows/Linting/badge.svg)](https://github.com/ahmedelshazly27/opendss-mcp-server/actions/workflows/lint.yml)
+[![codecov](https://codecov.io/gh/ahmedelshazly27/opendss-mcp-server/branch/main/graph/badge.svg)](https://codecov.io/gh/ahmedelshazly27/opendss-mcp-server)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![OpenDSS](https://img.shields.io/badge/OpenDSS-9.8%2B-orange.svg)](https://www.epri.com/OpenDSS)
 [![MCP](https://img.shields.io/badge/MCP-1.0-purple.svg)](https://modelcontextprotocol.io/)
 
