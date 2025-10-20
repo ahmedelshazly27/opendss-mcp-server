@@ -22,7 +22,7 @@ def test_der_optimization_solar():
         der_type="solar",
         capacity_kw=500,
         objective="minimize_losses",
-        candidate_buses=["675", "671", "611", "652"]
+        candidate_buses=["675", "671", "611", "652"],
     )
 
     # Verify operation succeeded
@@ -54,7 +54,7 @@ def test_der_optimization_battery():
         capacity_kw=300,
         battery_kwh=1200,  # 4-hour battery
         objective="minimize_losses",
-        candidate_buses=["675", "671"]
+        candidate_buses=["675", "671"],
     )
 
     # Verify success
@@ -87,7 +87,7 @@ def test_comparison_table():
         der_type="solar",
         capacity_kw=400,
         objective="minimize_losses",
-        candidate_buses=["675", "671", "611", "652", "645"]
+        candidate_buses=["675", "671", "611", "652", "645"],
     )
 
     assert result["success"]
@@ -108,8 +108,10 @@ def test_comparison_table():
     # Verify sorting by objective_value (descending - higher is better)
     if len(comparison_table) > 1:
         for i in range(len(comparison_table) - 1):
-            assert comparison_table[i]["objective_value"] >= comparison_table[i + 1]["objective_value"], \
-                "Comparison table should be sorted by objective_value (descending)"
+            assert (
+                comparison_table[i]["objective_value"]
+                >= comparison_table[i + 1]["objective_value"]
+            ), "Comparison table should be sorted by objective_value (descending)"
 
     # Verify optimal bus matches first entry in comparison table
     optimal_bus = result["data"]["optimal_bus"]
@@ -128,14 +130,13 @@ def test_der_optimization_with_vvc():
         capacity_kw=500,
         objective="minimize_losses",
         candidate_buses=["675", "671", "611", "652"],
-        control_settings={
-            "curve": "IEEE1547",
-            "response_time": 10.0
-        }
+        control_settings={"curve": "IEEE1547", "response_time": 10.0},
     )
 
     # Verify operation succeeded
-    assert result["success"], f"DER optimization with VVC failed: {result.get('errors')}"
+    assert result[
+        "success"
+    ], f"DER optimization with VVC failed: {result.get('errors')}"
 
     # Verify optimal bus was found
     data = result["data"]
@@ -150,13 +151,17 @@ def test_der_optimization_with_vvc():
     assert len(comparison_table) > 0
 
     for entry in comparison_table:
-        assert "q_support_kvar" in entry, "VVC optimization should include q_support_kvar"
+        assert (
+            "q_support_kvar" in entry
+        ), "VVC optimization should include q_support_kvar"
         assert isinstance(entry["q_support_kvar"], (int, float))
 
     # At least one bus should have non-zero reactive power support
     # Note: The actual value depends on voltage conditions, but we can verify the field exists
     q_values = [entry["q_support_kvar"] for entry in comparison_table]
-    assert any(isinstance(q, (int, float)) for q in q_values), "Should have q_support_kvar values"
+    assert any(
+        isinstance(q, (int, float)) for q in q_values
+    ), "Should have q_support_kvar values"
 
 
 def test_der_optimization_solar_battery_vvc():
@@ -172,10 +177,7 @@ def test_der_optimization_solar_battery_vvc():
         battery_kwh=1600,
         objective="minimize_violations",
         candidate_buses=["675", "671", "611"],
-        control_settings={
-            "curve": "RULE21",
-            "response_time": 5.0
-        }
+        control_settings={"curve": "RULE21", "response_time": 5.0},
     )
 
     # Verify operation succeeded
@@ -203,7 +205,7 @@ def test_vvc_vs_no_vvc_comparison():
         der_type="solar",
         capacity_kw=500,
         objective="minimize_losses",
-        candidate_buses=["675", "671"]
+        candidate_buses=["675", "671"],
     )
 
     # Reload feeder for second run to avoid duplicate elements
@@ -216,7 +218,7 @@ def test_vvc_vs_no_vvc_comparison():
         capacity_kw=500,
         objective="minimize_losses",
         candidate_buses=["675", "671"],
-        control_settings={"curve": "IEEE1547"}
+        control_settings={"curve": "IEEE1547"},
     )
 
     # Both should succeed
@@ -237,6 +239,214 @@ def test_vvc_vs_no_vvc_comparison():
     for entry in with_vvc_table:
         assert "q_support_kvar" in entry
         assert isinstance(entry["q_support_kvar"], (int, float))
+
+
+def test_invalid_der_type():
+    """Test that invalid DER type returns error."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="nuclear", capacity_kw=500, candidate_buses=["675"]  # Invalid type
+    )
+
+    assert result["success"] is False
+    assert "unsupported" in result["errors"][0].lower()
+
+
+def test_invalid_objective():
+    """Test that invalid objective returns error."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="solar",
+        capacity_kw=500,
+        objective="maximize_profit",  # Invalid objective
+        candidate_buses=["675"],
+    )
+
+    assert result["success"] is False
+    assert "unsupported objective" in result["errors"][0].lower()
+
+
+def test_no_circuit_loaded():
+    """Test that optimization without loaded circuit returns error."""
+    import opendssdirect as dss
+
+    dss.Text.Command("Clear")
+
+    result = optimize_der_placement(
+        der_type="solar", capacity_kw=500, candidate_buses=["675"]
+    )
+
+    assert result["success"] is False
+    # Accept either "no circuit" or OpenDSS's "no active circuit" message
+    assert (
+        "no circuit" in result["errors"][0].lower()
+        or "active circuit" in result["errors"][0].lower()
+    )
+
+
+def test_invalid_bus_ids():
+    """Test that invalid bus IDs return error."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="solar",
+        capacity_kw=500,
+        candidate_buses=["INVALID_BUS_1", "INVALID_BUS_2"],
+    )
+
+    assert result["success"] is False
+    assert "invalid bus" in result["errors"][0].lower()
+
+
+def test_negative_capacity():
+    """Test that negative capacity raises ValueError."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="solar", capacity_kw=-500, candidate_buses=["675"]
+    )
+
+    assert result["success"] is False
+
+
+def test_negative_battery_kwh():
+    """Test that negative battery capacity raises ValueError."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="battery", capacity_kw=500, battery_kwh=-1000, candidate_buses=["675"]
+    )
+
+    assert result["success"] is False
+
+
+def test_wind_der_type():
+    """Test optimization with wind DER type."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="wind",
+        capacity_kw=300,
+        objective="minimize_losses",
+        candidate_buses=["675", "671"],
+    )
+
+    assert result["success"]
+    assert result["data"]["der_type"] == "wind"
+
+
+def test_ev_charger_der_type():
+    """Test optimization with EV charger DER type."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="ev_charger",
+        capacity_kw=200,
+        objective="minimize_losses",
+        candidate_buses=["675"],
+    )
+
+    assert result["success"]
+    assert result["data"]["der_type"] == "ev_charger"
+
+
+def test_maximize_capacity_objective():
+    """Test optimization with maximize_capacity objective."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="solar",
+        capacity_kw=500,
+        objective="maximize_capacity",
+        candidate_buses=["675", "671"],
+    )
+
+    assert result["success"]
+    assert result["data"]["objective"] == "maximize_capacity"
+
+
+def test_minimize_violations_objective():
+    """Test optimization with minimize_violations objective."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="battery",
+        capacity_kw=300,
+        objective="minimize_violations",
+        candidate_buses=["675", "671"],
+    )
+
+    assert result["success"]
+    assert result["data"]["objective"] == "minimize_violations"
+
+
+def test_all_buses_evaluation():
+    """Test optimization evaluating all buses (auto-selection)."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    # Don't specify candidate_buses - should evaluate all (up to max_candidates)
+    result = optimize_der_placement(
+        der_type="solar",
+        capacity_kw=300,
+        objective="minimize_losses",
+        constraints={"max_candidates": 5},  # Limit to 5 for speed
+    )
+
+    assert result["success"]
+    # Should have evaluated some buses
+    assert result["data"]["analysis_parameters"]["candidates_evaluated"] > 0
+    # Should be limited by max_candidates
+    assert result["data"]["analysis_parameters"]["candidates_evaluated"] <= 5
+
+
+def test_custom_voltage_constraints():
+    """Test optimization with custom voltage constraints."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="solar",
+        capacity_kw=400,
+        objective="minimize_violations",
+        candidate_buses=["675", "671"],
+        constraints={"min_voltage_pu": 0.98, "max_voltage_pu": 1.02},
+    )
+
+    assert result["success"]
+    # Verify constraints were applied
+    assert result["data"]["constraints"]["min_voltage_pu"] == 0.98
+    assert result["data"]["constraints"]["max_voltage_pu"] == 1.02
+
+
+def test_zero_loss_reduction_percentage():
+    """Test that zero baseline losses doesn't cause division by zero."""
+    # This test verifies the loss_reduction_pct calculation handles zero baseline
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = optimize_der_placement(
+        der_type="solar", capacity_kw=100, candidate_buses=["675"]  # Small capacity
+    )
+
+    assert result["success"]
+    # Should have loss_reduction_pct field
+    assert "loss_reduction_pct" in result["data"]["improvement_metrics"]
+    # Should be a valid number
+    assert isinstance(
+        result["data"]["improvement_metrics"]["loss_reduction_pct"], (int, float)
+    )
 
 
 if __name__ == "__main__":

@@ -20,8 +20,13 @@ logger = logging.getLogger(__name__)
 
 # Supported DER types
 SUPPORTED_DER_TYPES = [
-    "solar", "battery", "solar_battery", "ev_charger", "wind",
-    "solar_vvc", "solar_battery_vvc"  # Volt-var control enabled variants
+    "solar",
+    "battery",
+    "solar_battery",
+    "ev_charger",
+    "wind",
+    "solar_vvc",
+    "solar_battery_vvc",  # Volt-var control enabled variants
 ]
 
 # Supported optimization objectives
@@ -103,7 +108,7 @@ def _add_der_at_bus(
     der_type: str,
     capacity_kw: float,
     battery_kwh: Optional[float] = None,
-    control_settings: Optional[Dict[str, Any]] = None
+    control_settings: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """Add a DER to the specified bus with optional volt-var control.
 
@@ -138,26 +143,42 @@ def _add_der_at_bus(
         # Add DER based on base type
         if base_type == "solar":
             # Add PV system
-            dss.Text.Command(f"New PVSystem.{der_name} Bus1={bus_id} kV={kv_base} kVA={capacity_kw} Pmpp={capacity_kw} irradiance=1.0")
+            dss.Text.Command(
+                f"New PVSystem.{der_name} Bus1={bus_id} kV={kv_base} kVA={capacity_kw} Pmpp={capacity_kw} irradiance=1.0"
+            )
 
         elif base_type == "battery":
             # Add battery storage
-            kwh = battery_kwh if battery_kwh else capacity_kw * 4  # Default 4-hour storage
-            dss.Text.Command(f"New Storage.{der_name} Bus1={bus_id} kV={kv_base} kWrated={capacity_kw} kWhrated={kwh} %stored=50 %discharge=50")
+            kwh = (
+                battery_kwh if battery_kwh else capacity_kw * 4
+            )  # Default 4-hour storage
+            dss.Text.Command(
+                f"New Storage.{der_name} Bus1={bus_id} kV={kv_base} kWrated={capacity_kw} kWhrated={kwh} %stored=50 %discharge=50"
+            )
 
         elif base_type == "solar_battery":
             # Add both PV and storage
-            dss.Text.Command(f"New PVSystem.{der_name}_pv Bus1={bus_id} kV={kv_base} kVA={capacity_kw} Pmpp={capacity_kw} irradiance=1.0")
-            kwh = battery_kwh if battery_kwh else capacity_kw * 2  # Default 2-hour for hybrid
-            dss.Text.Command(f"New Storage.{der_name}_batt Bus1={bus_id} kV={kv_base} kWrated={capacity_kw * 0.5} kWhrated={kwh} %stored=50")
+            dss.Text.Command(
+                f"New PVSystem.{der_name}_pv Bus1={bus_id} kV={kv_base} kVA={capacity_kw} Pmpp={capacity_kw} irradiance=1.0"
+            )
+            kwh = (
+                battery_kwh if battery_kwh else capacity_kw * 2
+            )  # Default 2-hour for hybrid
+            dss.Text.Command(
+                f"New Storage.{der_name}_batt Bus1={bus_id} kV={kv_base} kWrated={capacity_kw * 0.5} kWhrated={kwh} %stored=50"
+            )
 
         elif base_type == "ev_charger":
             # Add EV charger as load (negative for generation during V2G)
-            dss.Text.Command(f"New Load.{der_name} Bus1={bus_id} kV={kv_base} kW={capacity_kw} PF=0.95")
+            dss.Text.Command(
+                f"New Load.{der_name} Bus1={bus_id} kV={kv_base} kW={capacity_kw} PF=0.95"
+            )
 
         elif base_type == "wind":
             # Add wind generator
-            dss.Text.Command(f"New Generator.{der_name} Bus1={bus_id} kV={kv_base} kW={capacity_kw} PF=0.95")
+            dss.Text.Command(
+                f"New Generator.{der_name} Bus1={bus_id} kV={kv_base} kW={capacity_kw} PF=0.95"
+            )
 
         else:
             logger.error(f"Unsupported DER type: {base_type}")
@@ -177,9 +198,13 @@ def _add_der_at_bus(
                 if base_type == "solar":
                     configure_volt_var_control(der_name, curve_points, response_time)
                 elif base_type == "solar_battery":
-                    configure_volt_var_control(f"{der_name}_pv", curve_points, response_time)
+                    configure_volt_var_control(
+                        f"{der_name}_pv", curve_points, response_time
+                    )
 
-                logger.info(f"Configured volt-var control for {der_name} with {curve_name} curve")
+                logger.info(
+                    f"Configured volt-var control for {der_name} with {curve_name} curve"
+                )
             except Exception as e:
                 logger.warning(f"Failed to configure volt-var control: {e}")
                 # Continue without control - don't fail the entire operation
@@ -222,8 +247,12 @@ def _remove_der_from_bus(bus_id: str, der_type: str) -> None:
         logger.error(f"Error removing DER: {e}")
 
 
-def _calculate_objective(objective: str, baseline_losses: float, current_losses: float,
-                         voltage_check: Dict[str, Any]) -> float:
+def _calculate_objective(
+    objective: str,
+    baseline_losses: float,
+    current_losses: float,
+    voltage_check: Dict[str, Any],
+) -> float:
     """Calculate objective function value.
 
     Args:
@@ -245,7 +274,9 @@ def _calculate_objective(objective: str, baseline_losses: float, current_losses:
 
     elif objective == "minimize_violations":
         # Negative count of violations (fewer violations is better)
-        num_violations = voltage_check.get("data", {}).get("summary", {}).get("total_violations", 0)
+        num_violations = (
+            voltage_check.get("data", {}).get("summary", {}).get("total_violations", 0)
+        )
         return -num_violations
 
     else:
@@ -259,7 +290,7 @@ def optimize_der_placement(
     objective: str = "minimize_losses",
     candidate_buses: Optional[List[str]] = None,
     constraints: Optional[Dict[str, Any]] = None,
-    control_settings: Optional[Dict[str, Any]] = None
+    control_settings: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Optimize DER placement to achieve specified objective with optional volt-var control.
 
@@ -387,7 +418,9 @@ def optimize_der_placement(
             return format_error_response("Baseline power flow did not converge")
 
         baseline_losses = _get_total_losses()
-        baseline_voltage_check = check_voltage_violations(min_voltage_pu, max_voltage_pu)
+        baseline_voltage_check = check_voltage_violations(
+            min_voltage_pu, max_voltage_pu
+        )
 
         # Determine candidate buses
         if candidate_buses is None:
@@ -398,7 +431,9 @@ def optimize_der_placement(
         else:
             # Validate provided buses exist
             all_buses_lower = [bus.lower() for bus in dss.Circuit.AllBusNames()]
-            invalid_buses = [bus for bus in candidate_buses if bus.lower() not in all_buses_lower]
+            invalid_buses = [
+                bus for bus in candidate_buses if bus.lower() not in all_buses_lower
+            ]
             if invalid_buses:
                 return format_error_response(
                     f"Invalid bus IDs: {', '.join(invalid_buses)}"
@@ -410,7 +445,9 @@ def optimize_der_placement(
         for bus_id in candidate_buses:
             try:
                 # Add DER at candidate bus
-                if not _add_der_at_bus(bus_id, der_type, capacity_kw, battery_kwh, control_settings):
+                if not _add_der_at_bus(
+                    bus_id, der_type, capacity_kw, battery_kwh, control_settings
+                ):
                     logger.warning(f"Failed to add DER at bus {bus_id}, skipping")
                     continue
 
@@ -418,31 +455,45 @@ def optimize_der_placement(
                 dss.Solution.Solve()
 
                 if not dss.Solution.Converged():
-                    logger.warning(f"Power flow did not converge with DER at {bus_id}, skipping")
+                    logger.warning(
+                        f"Power flow did not converge with DER at {bus_id}, skipping"
+                    )
                     _remove_der_from_bus(bus_id, der_type)
                     continue
 
                 # Get metrics
                 current_losses = _get_total_losses()
                 voltage_check = check_voltage_violations(min_voltage_pu, max_voltage_pu)
-                num_violations = voltage_check.get("data", {}).get("summary", {}).get("total_violations", 0)
+                num_violations = (
+                    voltage_check.get("data", {})
+                    .get("summary", {})
+                    .get("total_violations", 0)
+                )
 
                 # Get reactive power support (for VVC-enabled DERs)
-                q_support_kvar = _get_der_reactive_power(bus_id, der_type) if "_vvc" in der_type else 0.0
+                q_support_kvar = (
+                    _get_der_reactive_power(bus_id, der_type)
+                    if "_vvc" in der_type
+                    else 0.0
+                )
 
                 # Calculate objective value
-                objective_value = _calculate_objective(objective, baseline_losses, current_losses, voltage_check)
+                objective_value = _calculate_objective(
+                    objective, baseline_losses, current_losses, voltage_check
+                )
 
                 # Store results
-                evaluation_results.append({
-                    "bus_id": bus_id,
-                    "objective_value": round(objective_value, 4),
-                    "losses_kw": round(current_losses, 2),
-                    "loss_reduction_kw": round(baseline_losses - current_losses, 2),
-                    "voltage_violations": num_violations,
-                    "q_support_kvar": round(q_support_kvar, 2),
-                    "converged": True
-                })
+                evaluation_results.append(
+                    {
+                        "bus_id": bus_id,
+                        "objective_value": round(objective_value, 4),
+                        "losses_kw": round(current_losses, 2),
+                        "loss_reduction_kw": round(baseline_losses - current_losses, 2),
+                        "voltage_violations": num_violations,
+                        "q_support_kvar": round(q_support_kvar, 2),
+                        "converged": True,
+                    }
+                )
 
                 # Remove DER for next iteration
                 _remove_der_from_bus(bus_id, der_type)
@@ -471,8 +522,15 @@ def optimize_der_placement(
         # Calculate improvement metrics
         improvement_metrics = {
             "loss_reduction_kw": optimal_result["loss_reduction_kw"],
-            "loss_reduction_pct": round((optimal_result["loss_reduction_kw"] / baseline_losses * 100), 2) if baseline_losses > 0 else 0.0,
-            "voltage_violations_change": optimal_result["voltage_violations"] - baseline_voltage_check.get("data", {}).get("summary", {}).get("total_violations", 0)
+            "loss_reduction_pct": (
+                round((optimal_result["loss_reduction_kw"] / baseline_losses * 100), 2)
+                if baseline_losses > 0
+                else 0.0
+            ),
+            "voltage_violations_change": optimal_result["voltage_violations"]
+            - baseline_voltage_check.get("data", {})
+            .get("summary", {})
+            .get("total_violations", 0),
         }
 
         # Prepare response data
@@ -485,21 +543,25 @@ def optimize_der_placement(
             "comparison_table": comparison_table,
             "baseline": {
                 "losses_kw": round(baseline_losses, 2),
-                "voltage_violations": baseline_voltage_check.get("data", {}).get("summary", {}).get("total_violations", 0)
+                "voltage_violations": baseline_voltage_check.get("data", {})
+                .get("summary", {})
+                .get("total_violations", 0),
             },
             "constraints": {
                 "min_voltage_pu": min_voltage_pu,
-                "max_voltage_pu": max_voltage_pu
+                "max_voltage_pu": max_voltage_pu,
             },
             "analysis_parameters": {
                 "candidates_evaluated": len(evaluation_results),
-                "candidates_requested": len(candidate_buses) if candidate_buses else "all"
-            }
+                "candidates_requested": (
+                    len(candidate_buses) if candidate_buses else "all"
+                ),
+            },
         }
 
         metadata = {
             "circuit_name": dss.Circuit.Name(),
-            "analysis_type": "der_placement_optimization"
+            "analysis_type": "der_placement_optimization",
         }
 
         return format_success_response(data, metadata)

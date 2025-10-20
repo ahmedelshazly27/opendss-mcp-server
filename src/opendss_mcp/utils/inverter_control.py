@@ -88,17 +88,13 @@ def load_curve(curve_name: str) -> list[tuple[float, float]]:
 
         # Validate required fields
         if "points" not in data:
-            raise ValueError(
-                f"Invalid curve file {curve_file}: missing 'points' field"
-            )
+            raise ValueError(f"Invalid curve file {curve_file}: missing 'points' field")
 
         # Extract points and convert to tuples
         points = [tuple(point) for point in data["points"]]
 
         if len(points) < 2:
-            raise ValueError(
-                f"Invalid curve {curve_file}: must have at least 2 points"
-            )
+            raise ValueError(f"Invalid curve {curve_file}: must have at least 2 points")
 
         logger.info(
             f"Loaded curve '{data.get('name', 'unknown')}' with {len(points)} points"
@@ -116,7 +112,7 @@ def configure_volt_var_control(
     pv_name: str,
     curve_points: list[tuple[float, float]],
     response_time: float = 10.0,
-    curve_name: str | None = None
+    curve_name: str | None = None,
 ) -> None:
     """Configure volt-var control for a PV system or inverter in OpenDSS.
 
@@ -201,7 +197,9 @@ def configure_volt_var_control(
 
         # Create InvControl object
         inv_control_name = f"InvCtrl_{pv_name}"
-        logger.info(f"Creating InvControl '{inv_control_name}' for PVSystem '{pv_name}'")
+        logger.info(
+            f"Creating InvControl '{inv_control_name}' for PVSystem '{pv_name}'"
+        )
 
         # Calculate DeltaQ_Factor from response time
         # DeltaQ_Factor controls the ramp rate: deltaQ = DeltaQ_Factor * (Qdesired - Qcurrent)
@@ -232,9 +230,7 @@ def configure_volt_var_control(
 
 
 def configure_volt_watt_control(
-    pv_name: str,
-    curve_points: list[tuple[float, float]],
-    curve_name: str | None = None
+    pv_name: str, curve_points: list[tuple[float, float]], curve_name: str | None = None
 ) -> None:
     """Configure volt-watt control for a PV system or inverter in OpenDSS.
 
@@ -324,7 +320,9 @@ def configure_volt_watt_control(
 
         # Create InvControl object
         inv_control_name = f"InvCtrl_{pv_name}"
-        logger.info(f"Creating InvControl '{inv_control_name}' for PVSystem '{pv_name}'")
+        logger.info(
+            f"Creating InvControl '{inv_control_name}' for PVSystem '{pv_name}'"
+        )
 
         # Note: InvControl parameter names differ from DSS documentation
         # Using 'voltwatt_curve' for volt-watt mode
@@ -336,9 +334,7 @@ def configure_volt_watt_control(
             f"AvgWindowLen=1"
         )
 
-        logger.info(
-            f"Volt-watt control configured for {pv_name} (curve: {curve_name})"
-        )
+        logger.info(f"Volt-watt control configured for {pv_name} (curve: {curve_name})")
 
     except Exception as e:
         error_msg = f"Error configuring volt-watt control for {pv_name}: {e}"
@@ -390,7 +386,7 @@ def get_inverter_status(pv_name: str) -> dict[str, Any]:
                 "kva": 0.0,
                 "pf": 0.0,
                 "voltage_pu": 0.0,
-                "errors": [f"PVSystem '{pv_name}' not found in circuit"]
+                "errors": [f"PVSystem '{pv_name}' not found in circuit"],
             }
 
         # Get power output
@@ -405,11 +401,13 @@ def get_inverter_status(pv_name: str) -> dict[str, Any]:
             kvar = 0.0
 
         # Calculate kVA and power factor
-        kva = (kw**2 + kvar**2)**0.5 if (kw != 0 or kvar != 0) else 0.0
+        kva = (kw**2 + kvar**2) ** 0.5 if (kw != 0 or kvar != 0) else 0.0
         pf = abs(kw / kva) if kva > 0 else 1.0
 
         # Get terminal voltage
-        bus_name = dss.CktElement.BusNames()[0].split(".")[0]  # Get bus name without phase
+        bus_name = dss.CktElement.BusNames()[0].split(".")[
+            0
+        ]  # Get bus name without phase
         dss.Circuit.SetActiveBus(bus_name)
         voltages = dss.Bus.puVmagAngle()
         voltage_pu = voltages[0] if voltages else 0.0
@@ -422,7 +420,7 @@ def get_inverter_status(pv_name: str) -> dict[str, Any]:
             "kva": round(kva, 4),
             "pf": round(pf, 4),
             "voltage_pu": round(voltage_pu, 4),
-            "errors": []
+            "errors": [],
         }
 
     except Exception as e:
@@ -435,7 +433,7 @@ def get_inverter_status(pv_name: str) -> dict[str, Any]:
             "kva": 0.0,
             "pf": 0.0,
             "voltage_pu": 0.0,
-            "errors": [str(e)]
+            "errors": [str(e)],
         }
 
 
@@ -464,12 +462,14 @@ def list_available_curves() -> list[dict[str, str]]:
             with open(curve_path, "r") as f:
                 data = json.load(f)
 
-            curves_info.append({
-                "name": name,
-                "file": filename,
-                "description": data.get("description", "No description"),
-                "type": data.get("type", "unknown")
-            })
+            curves_info.append(
+                {
+                    "name": name,
+                    "file": filename,
+                    "description": data.get("description", "No description"),
+                    "type": data.get("type", "unknown"),
+                }
+            )
         except Exception as e:
             logger.warning(f"Could not load curve info for {name}: {e}")
 

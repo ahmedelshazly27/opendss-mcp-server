@@ -15,26 +15,28 @@ from ..utils.harmonics import get_harmonic_voltages, get_harmonic_currents
 
 # Map of solution mode names to their corresponding integer values in OpenDSS
 SOLUTION_MODES = {
-    'snapshot': 0,
-    'snap': 0,
-    'daily': 1,
-    'yearly': 2,
-    'dutycycle': 3,
-    'direct': 4,
-    'montecarlo1': 5,
-    'montecarlo2': 6,
-    'montecarlo3': 7,
-    'faultstudy': 8,
-    'mf': 9,
-    'peakday': 10,
-    'loadduration1': 11,
-    'loadduration2': 12
+    "snapshot": 0,
+    "snap": 0,
+    "daily": 1,
+    "yearly": 2,
+    "dutycycle": 3,
+    "direct": 4,
+    "montecarlo1": 5,
+    "montecarlo2": 6,
+    "montecarlo3": 7,
+    "faultstudy": 8,
+    "mf": 9,
+    "peakday": 10,
+    "loadduration1": 11,
+    "loadduration2": 12,
 }
 
 logger = logging.getLogger(__name__)
 
 
-def _perform_harmonic_analysis(all_buses: list[str], harmonic_orders: list[int]) -> dict[str, Any]:
+def _perform_harmonic_analysis(
+    all_buses: list[str], harmonic_orders: list[int]
+) -> dict[str, Any]:
     """Perform harmonic analysis on all buses and lines in the circuit.
 
     This internal helper function calculates THD for voltages at all buses
@@ -98,20 +100,21 @@ def _perform_harmonic_analysis(all_buses: list[str], harmonic_orders: list[int])
         worst_thd_bus = max(thd_voltage, key=thd_voltage.get)
         worst_thd_value = thd_voltage[worst_thd_bus]
 
-    logger.info(f"Harmonic analysis complete. Worst THD: {worst_thd_value:.2f}% at bus {worst_thd_bus}")
+    logger.info(
+        f"Harmonic analysis complete. Worst THD: {worst_thd_value:.2f}% at bus {worst_thd_bus}"
+    )
 
     return {
         "thd_voltage": thd_voltage,
         "thd_current": thd_current,
         "individual_harmonics": individual_harmonics,
         "worst_thd_bus": worst_thd_bus,
-        "worst_thd_value": round(worst_thd_value, 4)
+        "worst_thd_value": round(worst_thd_value, 4),
     }
 
 
 def run_power_flow(
-    feeder_id: str,
-    options: dict[str, Any] | None = None
+    feeder_id: str, options: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """
     Run power flow analysis on a loaded feeder with optional harmonic analysis.
@@ -166,11 +169,11 @@ def run_power_flow(
     try:
         # Set default options if not provided
         options = options or {}
-        max_iterations = options.get('max_iterations', 100)
-        tolerance = options.get('tolerance', 0.0001)
-        control_mode = options.get('control_mode', 'snapshot')
-        harmonic_analysis = options.get('harmonic_analysis', False)
-        harmonic_orders = options.get('harmonic_orders', [1, 3, 5, 7, 9, 11, 13])
+        max_iterations = options.get("max_iterations", 100)
+        tolerance = options.get("tolerance", 0.0001)
+        control_mode = options.get("control_mode", "snapshot")
+        harmonic_analysis = options.get("harmonic_analysis", False)
+        harmonic_orders = options.get("harmonic_orders", [1, 3, 5, 7, 9, 11, 13])
 
         # Configure power flow settings
         dss.Solution.MaxControlIterations(max_iterations)
@@ -210,26 +213,26 @@ def run_power_flow(
 
         # Prepare base results
         result = {
-            'feeder_id': feeder_id,
-            'converged': converged,
-            'iterations': iterations,
-            'bus_voltages': bus_voltages,
-            'min_voltage': min_voltage,
-            'max_voltage': max_voltage,
-            'options': {
-                'max_iterations': max_iterations,
-                'tolerance': tolerance,
-                'control_mode': control_mode
-            }
+            "feeder_id": feeder_id,
+            "converged": converged,
+            "iterations": iterations,
+            "bus_voltages": bus_voltages,
+            "min_voltage": min_voltage,
+            "max_voltage": max_voltage,
+            "options": {
+                "max_iterations": max_iterations,
+                "tolerance": tolerance,
+                "control_mode": control_mode,
+            },
         }
 
         # Perform harmonic analysis if requested
         if harmonic_analysis:
             logger.info("Running harmonic analysis...")
             harmonics_data = _perform_harmonic_analysis(all_buses, harmonic_orders)
-            result['harmonics'] = harmonics_data
-            result['options']['harmonic_analysis'] = True
-            result['options']['harmonic_orders'] = harmonic_orders
+            result["harmonics"] = harmonics_data
+            result["options"]["harmonic_analysis"] = True
+            result["options"]["harmonic_orders"] = harmonic_orders
 
         return format_success_response(result)
 

@@ -205,11 +205,11 @@ New Capacitor.C92c      Bus1=92.3    Phases=1     kVAR=50      kV=2.402
 !REGULATORS - REDIRECT TO DEFINITIONS FILE
 ! This file contains definitions for the remainder of regulators on the feeder:
 
-! Redirect IEEE123Regulators.DSS  ! Commented out - file not provided in simplified version
+Redirect IEEE123Regulators.DSS
 
 ! SPOT LOADS -- REDIRECT INPUT STREAM TO LOAD DEFINITIONS FILE
 
-! Redirect IEEE123Loads.DSS  ! Commented out - file not provided in simplified version
+Redirect IEEE123Loads.DSS
 
 ! All devices in the test feeder are now defined.
 !

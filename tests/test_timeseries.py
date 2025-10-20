@@ -16,9 +16,7 @@ def test_timeseries_24_hours():
 
     # Run 24-hour simulation with residential summer profile
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        duration_hours=24,
-        timestep_minutes=60
+        load_profile="residential_summer", duration_hours=24, timestep_minutes=60
     )
 
     # Verify success
@@ -51,14 +49,16 @@ def test_timeseries_with_solar():
     load_ieee_test_feeder("IEEE13")
 
     # Add a PV system to the circuit
-    dss.Text.Command("New PVSystem.TestPV Bus1=675 Phases=3 kV=4.16 kVA=500 Pmpp=500 irradiance=1.0")
+    dss.Text.Command(
+        "New PVSystem.TestPV Bus1=675 Phases=3 kV=4.16 kVA=500 Pmpp=500 irradiance=1.0"
+    )
 
     # Run simulation with both load and solar profiles
     result = run_time_series_simulation(
         load_profile="residential_summer",
         generation_profile="solar_clear_day",
         duration_hours=24,
-        timestep_minutes=60
+        timestep_minutes=60,
     )
 
     # Verify success
@@ -74,7 +74,12 @@ def test_timeseries_with_solar():
         assert 0.0 <= gen_mult <= 1.0, f"Generation multiplier {gen_mult} out of range"
 
     # Verify solar profile shape (zero at night, peak during day)
-    night_timesteps = [timesteps[0], timesteps[1], timesteps[22], timesteps[23]]  # Midnight, 1am, 10pm, 11pm
+    night_timesteps = [
+        timesteps[0],
+        timesteps[1],
+        timesteps[22],
+        timesteps[23],
+    ]  # Midnight, 1am, 10pm, 11pm
     day_timesteps = [timesteps[11], timesteps[12]]  # Noon, 1pm
 
     for ts in night_timesteps:
@@ -97,9 +102,7 @@ def test_summary_statistics():
 
     # Run simulation
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        duration_hours=24,
-        timestep_minutes=60
+        load_profile="residential_summer", duration_hours=24, timestep_minutes=60
     )
 
     assert result["success"]
@@ -119,7 +122,7 @@ def test_summary_statistics():
         "min_voltage_pu",
         "max_voltage_pu",
         "avg_voltage_pu",
-        "convergence_rate_pct"
+        "convergence_rate_pct",
     ]
 
     for field in required_fields:
@@ -132,8 +135,9 @@ def test_summary_statistics():
     # Check losses are positive
     assert summary["avg_losses_kw"] > 0, "Average losses should be positive"
     assert summary["peak_losses_kw"] > 0, "Peak losses should be positive"
-    assert summary["peak_losses_kw"] >= summary["avg_losses_kw"], \
-        "Peak losses should be >= average losses"
+    assert (
+        summary["peak_losses_kw"] >= summary["avg_losses_kw"]
+    ), "Peak losses should be >= average losses"
 
     # Check load statistics
     assert summary["peak_load_kw"] > 0, "Peak load should be positive"
@@ -142,12 +146,19 @@ def test_summary_statistics():
     # Check voltage statistics
     assert 0.9 <= summary["min_voltage_pu"] <= 1.1, "Min voltage should be reasonable"
     assert 0.9 <= summary["max_voltage_pu"] <= 1.1, "Max voltage should be reasonable"
-    assert summary["min_voltage_pu"] <= summary["avg_voltage_pu"] <= summary["max_voltage_pu"], \
-        "Average voltage should be between min and max"
+    assert (
+        summary["min_voltage_pu"]
+        <= summary["avg_voltage_pu"]
+        <= summary["max_voltage_pu"]
+    ), "Average voltage should be between min and max"
 
     # Check convergence rate
-    assert 0 <= summary["convergence_rate_pct"] <= 100, "Convergence rate should be 0-100%"
-    assert summary["convergence_rate_pct"] == 100.0, "All timesteps should converge for IEEE13"
+    assert (
+        0 <= summary["convergence_rate_pct"] <= 100
+    ), "Convergence rate should be 0-100%"
+    assert (
+        summary["convergence_rate_pct"] == 100.0
+    ), "All timesteps should converge for IEEE13"
 
 
 def test_custom_profile_dict():
@@ -156,16 +167,11 @@ def test_custom_profile_dict():
     load_ieee_test_feeder("IEEE13")
 
     # Create custom profile with constant 50% load
-    custom_profile = {
-        "name": "CUSTOM_CONSTANT",
-        "multipliers": [0.5] * 24
-    }
+    custom_profile = {"name": "CUSTOM_CONSTANT", "multipliers": [0.5] * 24}
 
     # Run simulation
     result = run_time_series_simulation(
-        load_profile=custom_profile,
-        duration_hours=24,
-        timestep_minutes=60
+        load_profile=custom_profile, duration_hours=24, timestep_minutes=60
     )
 
     assert result["success"]
@@ -186,9 +192,7 @@ def test_different_timestep_resolution():
 
     # Run with 30-minute timesteps (should get 48 timesteps for 24 hours)
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        duration_hours=24,
-        timestep_minutes=30
+        load_profile="residential_summer", duration_hours=24, timestep_minutes=30
     )
 
     assert result["success"]
@@ -200,8 +204,9 @@ def test_different_timestep_resolution():
     # Verify hour increments are correct (0.5 hour steps)
     for i, ts in enumerate(timesteps):
         expected_hour = i * 0.5
-        assert abs(ts["hour"] - expected_hour) < 0.01, \
-            f"Timestep {i} hour should be {expected_hour}, got {ts['hour']}"
+        assert (
+            abs(ts["hour"] - expected_hour) < 0.01
+        ), f"Timestep {i} hour should be {expected_hour}, got {ts['hour']}"
 
     # Verify summary reflects correct resolution
     summary = result["data"]["summary"]
@@ -219,7 +224,7 @@ def test_output_variables_selection():
         load_profile="residential_summer",
         duration_hours=24,
         timestep_minutes=60,
-        output_variables=["losses"]
+        output_variables=["losses"],
     )
 
     assert result["success"]
@@ -243,7 +248,7 @@ def test_output_variables_all():
         load_profile="residential_summer",
         duration_hours=24,
         timestep_minutes=60,
-        output_variables=["voltages", "losses", "loadings", "powers"]
+        output_variables=["voltages", "losses", "loadings", "powers"],
     )
 
     assert result["success"]
@@ -268,9 +273,7 @@ def test_energy_calculation():
 
     # Run simulation
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        duration_hours=24,
-        timestep_minutes=60
+        load_profile="residential_summer", duration_hours=24, timestep_minutes=60
     )
 
     assert result["success"]
@@ -284,8 +287,9 @@ def test_energy_calculation():
     manual_energy = sum(ts["total_load_kw"] * timestep_hours for ts in timesteps)
 
     # Should match the reported energy_served_kwh
-    assert abs(summary["energy_served_kwh"] - manual_energy) < 0.1, \
-        f"Energy mismatch: {summary['energy_served_kwh']} vs {manual_energy}"
+    assert (
+        abs(summary["energy_served_kwh"] - manual_energy) < 0.1
+    ), f"Energy mismatch: {summary['energy_served_kwh']} vs {manual_energy}"
 
 
 def test_peak_load_timing():
@@ -295,9 +299,7 @@ def test_peak_load_timing():
 
     # Run simulation with residential summer (peak at hour 16 = 5 PM)
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        duration_hours=24,
-        timestep_minutes=60
+        load_profile="residential_summer", duration_hours=24, timestep_minutes=60
     )
 
     assert result["success"]
@@ -314,8 +316,9 @@ def test_peak_load_timing():
 
     # For residential summer, peak should be around hour 16 (5 PM)
     # Multiplier is 1.0 at hour 16
-    assert 15 <= peak_timestep["hour"] <= 17, \
-        f"Peak load at hour {peak_timestep['hour']}, expected around hour 16"
+    assert (
+        15 <= peak_timestep["hour"] <= 17
+    ), f"Peak load at hour {peak_timestep['hour']}, expected around hour 16"
 
 
 def test_no_generation_profile():
@@ -325,9 +328,7 @@ def test_no_generation_profile():
 
     # Run without generation profile
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        generation_profile=None,
-        duration_hours=24
+        load_profile="residential_summer", generation_profile=None, duration_hours=24
     )
 
     assert result["success"]
@@ -348,8 +349,7 @@ def test_invalid_profile_name():
 
     # Run with non-existent profile
     result = run_time_series_simulation(
-        load_profile="nonexistent_profile",
-        duration_hours=24
+        load_profile="nonexistent_profile", duration_hours=24
     )
 
     # Should fail gracefully
@@ -365,8 +365,7 @@ def test_no_circuit_loaded():
 
     # Try to run simulation without loading feeder
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        duration_hours=24
+        load_profile="residential_summer", duration_hours=24
     )
 
     # Should fail with appropriate error
@@ -382,9 +381,7 @@ def test_short_duration_simulation():
 
     # Run 6-hour simulation
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        duration_hours=6,
-        timestep_minutes=60
+        load_profile="residential_summer", duration_hours=6, timestep_minutes=60
     )
 
     assert result["success"]
@@ -405,9 +402,7 @@ def test_long_duration_simulation():
 
     # Run 48-hour simulation (2 days)
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        duration_hours=48,
-        timestep_minutes=60
+        load_profile="residential_summer", duration_hours=48, timestep_minutes=60
     )
 
     assert result["success"]
@@ -417,8 +412,9 @@ def test_long_duration_simulation():
     assert len(timesteps) == 48
 
     # Verify profile repeats (hour 0 and hour 24 should have same multiplier)
-    assert timesteps[0]["load_multiplier"] == timesteps[24]["load_multiplier"], \
-        "Profile should repeat after 24 hours"
+    assert (
+        timesteps[0]["load_multiplier"] == timesteps[24]["load_multiplier"]
+    ), "Profile should repeat after 24 hours"
 
 
 def test_voltage_statistics():
@@ -431,7 +427,7 @@ def test_voltage_statistics():
         load_profile="residential_summer",
         duration_hours=24,
         timestep_minutes=60,
-        output_variables=["voltages", "losses"]
+        output_variables=["voltages", "losses"],
     )
 
     assert result["success"]
@@ -447,10 +443,12 @@ def test_voltage_statistics():
     overall_min = min(min_voltages)
     overall_max = max(max_voltages)
 
-    assert abs(summary["min_voltage_pu"] - overall_min) < 0.01, \
-        f"Summary min voltage {summary['min_voltage_pu']} should match overall min {overall_min}"
-    assert abs(summary["max_voltage_pu"] - overall_max) < 0.01, \
-        f"Summary max voltage {summary['max_voltage_pu']} should match overall max {overall_max}"
+    assert (
+        abs(summary["min_voltage_pu"] - overall_min) < 0.01
+    ), f"Summary min voltage {summary['min_voltage_pu']} should match overall min {overall_min}"
+    assert (
+        abs(summary["max_voltage_pu"] - overall_max) < 0.01
+    ), f"Summary max voltage {summary['max_voltage_pu']} should match overall max {overall_max}"
 
 
 def test_line_loading_statistics():
@@ -463,7 +461,7 @@ def test_line_loading_statistics():
         load_profile="commercial_weekday",
         duration_hours=24,
         timestep_minutes=60,
-        output_variables=["loadings"]
+        output_variables=["loadings"],
     )
 
     assert result["success"]
@@ -490,9 +488,7 @@ def test_convergence_rate():
 
     # Run simulation
     result = run_time_series_simulation(
-        load_profile="residential_summer",
-        duration_hours=24,
-        timestep_minutes=60
+        load_profile="residential_summer", duration_hours=24, timestep_minutes=60
     )
 
     assert result["success"]
@@ -501,8 +497,9 @@ def test_convergence_rate():
 
     # Verify convergence rate
     assert "convergence_rate_pct" in summary
-    assert summary["convergence_rate_pct"] == 100.0, \
-        "IEEE13 should converge at all timesteps"
+    assert (
+        summary["convergence_rate_pct"] == 100.0
+    ), "IEEE13 should converge at all timesteps"
 
     # Count converged timesteps manually
     timesteps = result["data"]["timesteps"]

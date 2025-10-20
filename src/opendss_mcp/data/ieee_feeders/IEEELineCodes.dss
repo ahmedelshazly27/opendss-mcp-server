@@ -1,0 +1,45 @@
+! IEEE Test Feeder Line Codes
+! Common line code definitions used across IEEE 13, 34, and 123 bus test feeders
+
+New linecode.300 nphases=3 R1=0.3465 X1=1.0179 R0=0.9735 X0=2.6685 C1=11.4982 C0=5.4906 units=mi normamps=400 emergamps=600
+New linecode.301 nphases=3 R1=0.4109 X1=1.0477 R0=1.0195 X0=2.6989 C1=11.1214 C0=5.3692 units=mi normamps=380 emergamps=570
+New linecode.302 nphases=3 R1=0.7926 X1=1.2557 R0=1.4034 X0=2.9065 C1=9.8768 C0=4.9498 units=mi normamps=275 emergamps=410
+New linecode.303 nphases=3 R1=0.5238 X1=1.1477 R0=1.1302 X0=2.7986 C1=10.4563 C0=5.1064 units=mi normamps=330 emergamps=500
+New linecode.304 nphases=3 R1=0.6468 X1=1.1977 R0=1.2522 X0=2.8486 C1=10.1202 C0=4.9866 units=mi normamps=300 emergamps=450
+
+! Single-phase line codes (from neutral)
+New linecode.1 nphases=1 R1=1.3368 X1=1.3343 R0=1.3425 X0=1.3360 C1=8.0 C0=5.0 units=mi normamps=230 emergamps=350
+New linecode.2 nphases=1 R1=1.3343 X1=1.3368 R0=1.3360 X0=1.3425 C1=8.0 C0=5.0 units=mi normamps=230 emergamps=350
+New linecode.3 nphases=1 R1=1.3360 X1=1.3425 R0=1.3343 X0=1.3368 C1=8.0 C0=5.0 units=mi normamps=230 emergamps=350
+
+! IEEE 13 bus specific line codes
+New linecode.601 nphases=3 R1=0.3465 X1=1.0179 R0=0.9735 X0=2.6685 C1=11.4982 C0=5.4906 units=mi normamps=400 emergamps=600
+New linecode.602 nphases=3 R1=0.7526 X1=1.1814 R0=1.3294 X0=2.8051 C1=10.2504 C0=5.0479 units=mi normamps=340 emergamps=510
+New linecode.603 nphases=2 R1=1.3238 X1=1.3569 R0=1.5037 X0=1.5329 C1=8.4591 C0=4.3251 units=mi normamps=230 emergamps=350
+New linecode.604 nphases=2 R1=1.3238 X1=1.3569 R0=1.5037 X0=1.5329 C1=8.4591 C0=4.3251 units=mi normamps=230 emergamps=350
+New linecode.605 nphases=1 R1=1.3292 X1=1.3475 R0=1.3292 X0=1.3475 C1=8.4591 C0=4.3251 units=mi normamps=230 emergamps=350
+New linecode.606 nphases=3 R1=0.7982 X1=0.4463 R0=1.4088 X0=0.5963 C1=12.4686 C0=6.9375 units=mi normamps=285 emergamps=430
+New linecode.607 nphases=1 R1=1.3425 X1=0.5124 R0=1.3425 X0=0.5124 C1=12.8800 C0=7.8330 units=mi normamps=230 emergamps=350
+
+! IEEE 34 bus specific line codes
+New linecode.11 nphases=1 R1=0.9813 X1=0.8360 R0=0.9813 X0=0.8360 C1=8.0 C0=5.0 units=mi normamps=275 emergamps=410
+New linecode.21 nphases=1 R1=0.9813 X1=0.8360 R0=0.9813 X0=0.8360 C1=8.0 C0=5.0 units=mi normamps=275 emergamps=410
+New linecode.22 nphases=2 R1=0.9813 X1=0.8360 R0=1.6467 X0=1.3292 C1=8.0 C0=5.0 units=mi normamps=275 emergamps=410
+New linecode.24 nphases=2 R1=0.9813 X1=0.8360 R0=1.6467 X0=1.3292 C1=8.0 C0=5.0 units=mi normamps=275 emergamps=410
+
+! IEEE 123 bus specific line codes
+New linecode.1 nphases=3 R1=0.4576 X1=1.0780 R0=1.0780 X0=2.3744 C1=12.7400 C0=6.0000 units=mi normamps=400 emergamps=600
+New linecode.2 nphases=3 R1=0.4666 X1=1.0482 R0=1.0871 X0=2.3448 C1=12.9510 C0=6.1110 units=mi normamps=400 emergamps=600
+New linecode.3 nphases=3 R1=0.4615 X1=1.0651 R0=1.0825 X0=2.3616 C1=12.8370 C0=6.0470 units=mi normamps=400 emergamps=600
+New linecode.4 nphases=3 R1=0.4681 X1=1.0473 R0=1.0886 X0=2.3439 C1=12.9600 C0=6.1200 units=mi normamps=400 emergamps=600
+New linecode.5 nphases=3 R1=0.4701 X1=1.0464 R0=1.0906 X0=2.3430 C1=12.9690 C0=6.1290 units=mi normamps=400 emergamps=600
+New linecode.6 nphases=3 R1=0.4726 X1=1.0453 R0=1.0931 X0=2.3419 C1=12.9800 C0=6.1400 units=mi normamps=400 emergamps=600
+New linecode.7 nphases=3 R1=0.4751 X1=1.0443 R0=1.0956 X0=2.3408 C1=12.9910 C0=6.1510 units=mi normamps=400 emergamps=600
+New linecode.8 nphases=2 R1=1.2292 X1=1.4083 R0=1.8674 X0=1.7274 C1=8.3090 C0=4.1450 units=mi normamps=230 emergamps=350
+New linecode.9 nphases=1 R1=1.3292 X1=1.3475 R0=1.3292 X0=1.3475 C1=8.4591 C0=4.3251 units=mi normamps=230 emergamps=350
+New linecode.10 nphases=1 R1=1.3368 X1=1.3343 R0=1.3368 X0=1.3343 C1=8.4650 C0=4.3310 units=mi normamps=230 emergamps=350
+New linecode.11 nphases=1 R1=1.3343 X1=1.3368 R0=1.3343 X0=1.3368 C1=8.4581 C0=4.3241 units=mi normamps=230 emergamps=350
+New linecode.12 nphases=1 R1=1.3425 X1=1.3292 R0=1.3425 X0=1.3292 C1=8.4700 C0=4.3360 units=mi normamps=230 emergamps=350
+
+! Triplex line codes (for secondary network)
+New linecode.trip nphases=1 R1=0.97 X1=0.21 R0=1.02 X0=0.21 C1=14.0 C0=14.0 units=mi normamps=200 emergamps=300

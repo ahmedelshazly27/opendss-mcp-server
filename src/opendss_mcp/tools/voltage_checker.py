@@ -61,7 +61,7 @@ def _get_bus_voltages_by_phase() -> Dict[str, Dict[str, float]]:
 
             # Extract phase voltages (magnitudes only, skip angles)
             phase_voltages = {}
-            phase_names = ['1', '2', '3']  # Standard phase naming
+            phase_names = ["1", "2", "3"]  # Standard phase naming
 
             for i in range(min(num_nodes, 3)):  # Limit to 3 phases
                 if i * 2 < len(volts):
@@ -80,7 +80,7 @@ def _get_bus_voltages_by_phase() -> Dict[str, Dict[str, float]]:
 def check_voltage_violations(
     min_voltage_pu: float = 0.95,
     max_voltage_pu: float = 1.05,
-    phase: Optional[str] = None
+    phase: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Check all bus voltages against specified limits and identify violations.
 
@@ -111,7 +111,7 @@ def check_voltage_violations(
         validate_voltage_limits(min_voltage_pu, max_voltage_pu)
 
         # Validate phase parameter if provided
-        if phase is not None and phase not in ['1', '2', '3']:
+        if phase is not None and phase not in ["1", "2", "3"]:
             return format_error_response(
                 f"Invalid phase '{phase}'. Must be '1', '2', '3', or None for all phases."
             )
@@ -152,28 +152,34 @@ def check_voltage_violations(
                 if violation_type:
                     severity = _calculate_severity(deviation_pu)
 
-                    violations.append({
-                        "bus": bus_name,
-                        "phase": phase_id,
-                        "voltage_pu": round(voltage_pu, 6),
-                        "violation_type": violation_type,
-                        "deviation_pu": round(deviation_pu, 6),
-                        "severity": severity
-                    })
+                    violations.append(
+                        {
+                            "bus": bus_name,
+                            "phase": phase_id,
+                            "voltage_pu": round(voltage_pu, 6),
+                            "violation_type": violation_type,
+                            "deviation_pu": round(deviation_pu, 6),
+                            "severity": severity,
+                        }
+                    )
 
         # Sort violations by absolute deviation (worst first)
         violations.sort(key=lambda x: abs(x["deviation_pu"]), reverse=True)
 
         # Create summary statistics
         num_violations = len(violations)
-        num_undervoltage = sum(1 for v in violations if v["violation_type"] == "undervoltage")
-        num_overvoltage = sum(1 for v in violations if v["violation_type"] == "overvoltage")
+        num_undervoltage = sum(
+            1 for v in violations if v["violation_type"] == "undervoltage"
+        )
+        num_overvoltage = sum(
+            1 for v in violations if v["violation_type"] == "overvoltage"
+        )
 
         # Count by severity
         severity_counts = {
             "minor": sum(1 for v in violations if v["severity"] == "minor"),
             "moderate": sum(1 for v in violations if v["severity"] == "moderate"),
-            "severe": sum(1 for v in violations if v["severity"] == "severe")
+            "severe": sum(1 for v in violations if v["severity"] == "severe"),
         }
 
         # Find worst violation
@@ -187,19 +193,19 @@ def check_voltage_violations(
                 "undervoltage_count": num_undervoltage,
                 "overvoltage_count": num_overvoltage,
                 "severity_counts": severity_counts,
-                "worst_violation": worst_violation
+                "worst_violation": worst_violation,
             },
             "limits": {
                 "min_voltage_pu": min_voltage_pu,
                 "max_voltage_pu": max_voltage_pu,
-                "phase_filter": phase
+                "phase_filter": phase,
             },
-            "total_buses_checked": len(bus_voltages)
+            "total_buses_checked": len(bus_voltages),
         }
 
         metadata = {
             "circuit_name": dss.Circuit.Name(),
-            "analysis_type": "voltage_violation_check"
+            "analysis_type": "voltage_violation_check",
         }
 
         return format_success_response(data, metadata)

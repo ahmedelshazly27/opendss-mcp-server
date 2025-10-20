@@ -19,10 +19,7 @@ def test_basic_capacity_analysis():
 
     # Run capacity analysis on a bus
     result = analyze_feeder_capacity(
-        bus_id="675",
-        der_type="solar",
-        increment_kw=100,
-        max_capacity_kw=2000
+        bus_id="675", der_type="solar", increment_kw=100, max_capacity_kw=2000
     )
 
     # Verify operation succeeded
@@ -55,7 +52,7 @@ def test_capacity_with_constraints():
     constraints = {
         "min_voltage_pu": 0.98,
         "max_voltage_pu": 1.02,
-        "max_line_loading_pct": 90.0
+        "max_line_loading_pct": 90.0,
     }
 
     result = analyze_feeder_capacity(
@@ -63,7 +60,7 @@ def test_capacity_with_constraints():
         der_type="solar",
         increment_kw=50,
         max_capacity_kw=1500,
-        constraints=constraints
+        constraints=constraints,
     )
 
     assert result["success"]
@@ -82,10 +79,7 @@ def test_return_format():
 
     # Run capacity analysis
     result = analyze_feeder_capacity(
-        bus_id="675",
-        der_type="solar",
-        increment_kw=100,
-        max_capacity_kw=1000
+        bus_id="675", der_type="solar", increment_kw=100, max_capacity_kw=1000
     )
 
     # Check top-level structure
@@ -105,7 +99,7 @@ def test_return_format():
         "capacity_curve",
         "baseline",
         "constraints",
-        "analysis_parameters"
+        "analysis_parameters",
     ]
 
     for field in required_fields:
@@ -143,6 +137,162 @@ def test_return_format():
     assert "circuit_name" in metadata
     assert "analysis_type" in metadata
     assert metadata["analysis_type"] == "hosting_capacity"
+
+
+def test_capacity_with_invalid_bus():
+    """Test capacity analysis with non-existent bus."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = analyze_feeder_capacity(
+        bus_id="NONEXISTENT_BUS",
+        der_type="solar",
+        increment_kw=100,
+        max_capacity_kw=1000,
+    )
+
+    assert result["success"] is False
+    assert len(result["errors"]) > 0
+    assert "not found" in result["errors"][0].lower()
+
+
+def test_capacity_with_invalid_der_type():
+    """Test capacity analysis with unsupported DER type."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = analyze_feeder_capacity(
+        bus_id="675",
+        der_type="nuclear",  # Invalid type
+        increment_kw=100,
+        max_capacity_kw=1000,
+    )
+
+    assert result["success"] is False
+    assert "unsupported" in result["errors"][0].lower()
+
+
+def test_capacity_with_battery():
+    """Test capacity analysis with battery DER."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = analyze_feeder_capacity(
+        bus_id="675", der_type="battery", increment_kw=100, max_capacity_kw=500
+    )
+
+    assert result["success"]
+    assert result["data"]["der_type"] == "battery"
+
+
+def test_capacity_with_wind():
+    """Test capacity analysis with wind DER."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = analyze_feeder_capacity(
+        bus_id="675", der_type="wind", increment_kw=100, max_capacity_kw=500
+    )
+
+    assert result["success"]
+    assert result["data"]["der_type"] == "wind"
+
+
+def test_capacity_with_negative_increment():
+    """Test that negative increment raises error."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = analyze_feeder_capacity(
+        bus_id="675", der_type="solar", increment_kw=-100, max_capacity_kw=1000
+    )
+
+    assert result["success"] is False
+
+
+def test_capacity_with_invalid_max_capacity():
+    """Test that negative max capacity raises error."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = analyze_feeder_capacity(
+        bus_id="675", der_type="solar", increment_kw=100, max_capacity_kw=-1000
+    )
+
+    assert result["success"] is False
+
+
+def test_capacity_increment_greater_than_max():
+    """Test that increment > max_capacity raises error."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = analyze_feeder_capacity(
+        bus_id="675", der_type="solar", increment_kw=2000, max_capacity_kw=1000
+    )
+
+    assert result["success"] is False
+    assert "cannot be greater than" in result["errors"][0].lower()
+
+
+def test_capacity_without_loaded_circuit():
+    """Test capacity analysis without loading a circuit first."""
+    import opendssdirect as dss
+
+    # Clear any loaded circuit
+    dss.Text.Command("Clear")
+
+    result = analyze_feeder_capacity(
+        bus_id="675", der_type="solar", increment_kw=100, max_capacity_kw=1000
+    )
+
+    assert result["success"] is False
+    # Accept either "no circuit loaded" or OpenDSS's "no active circuit" message
+    assert (
+        "no circuit" in result["errors"][0].lower()
+        or "active circuit" in result["errors"][0].lower()
+    )
+
+
+def test_capacity_with_small_increment():
+    """Test capacity analysis with very small increment for detailed curve."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    result = analyze_feeder_capacity(
+        bus_id="675", der_type="solar", increment_kw=25, max_capacity_kw=500
+    )
+
+    assert result["success"]
+    # Should have at least 1 point in capacity curve (baseline or first increment)
+    assert len(result["data"]["capacity_curve"]) >= 1
+    # Verify increment was recorded correctly
+    assert result["data"]["analysis_parameters"]["increment_kw"] == 25
+
+
+def test_capacity_limiting_constraint_detected():
+    """Test that limiting constraint is properly identified."""
+    load_ieee_test_feeder("IEEE13")
+    run_power_flow("IEEE13")
+
+    # Use strict constraints to ensure we hit a limit
+    result = analyze_feeder_capacity(
+        bus_id="675",
+        der_type="solar",
+        increment_kw=200,
+        max_capacity_kw=3000,
+        constraints={
+            "min_voltage_pu": 0.99,
+            "max_voltage_pu": 1.01,
+            "max_line_loading_pct": 80.0,
+        },
+    )
+
+    assert result["success"]
+    # Should have identified a limiting constraint
+    if result["data"]["max_capacity_kw"] < 3000:
+        assert result["data"]["limiting_constraint"] is not None
+        assert result["data"]["violation_details"] is not None
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, TypedDict, Union
 
 class SuccessResponse(TypedDict):
     """Type definition for success response structure."""
+
     success: bool
     data: Union[Dict[str, Any], List[Any], None]
     metadata: Optional[Dict[str, Any]]
@@ -18,6 +19,7 @@ class SuccessResponse(TypedDict):
 
 class ErrorResponse(TypedDict):
     """Type definition for error response structure."""
+
     success: bool
     data: None
     metadata: None
@@ -26,6 +28,7 @@ class ErrorResponse(TypedDict):
 
 class VoltageStats(TypedDict):
     """Type definition for voltage statistics."""
+
     min: float
     max: float
     avg: float
@@ -35,6 +38,7 @@ class VoltageStats(TypedDict):
 
 class LineFlowStats(TypedDict):
     """Type definition for line flow statistics."""
+
     max_loading: float
     max_loading_line: str
     total_p: float
@@ -43,8 +47,7 @@ class LineFlowStats(TypedDict):
 
 
 def format_success_response(
-    data: Union[Dict[str, Any], List[Any]],
-    metadata: Optional[Dict[str, Any]] = None
+    data: Union[Dict[str, Any], List[Any]], metadata: Optional[Dict[str, Any]] = None
 ) -> SuccessResponse:
     """Format a successful API response.
 
@@ -55,12 +58,7 @@ def format_success_response(
     Returns:
         SuccessResponse: Formatted success response
     """
-    return {
-        "success": True,
-        "data": data,
-        "metadata": metadata or {},
-        "errors": None
-    }
+    return {"success": True, "data": data, "metadata": metadata or {}, "errors": None}
 
 
 def format_error_response(errors: Union[str, List[str]]) -> ErrorResponse:
@@ -74,12 +72,7 @@ def format_error_response(errors: Union[str, List[str]]) -> ErrorResponse:
     """
     if isinstance(errors, str):
         errors = [errors]
-    return {
-        "success": False,
-        "data": None,
-        "metadata": None,
-        "errors": errors
-    }
+    return {"success": False, "data": None, "metadata": None, "errors": errors}
 
 
 def format_voltage_results(voltages: Dict[str, float]) -> Dict[str, Any]:
@@ -92,13 +85,7 @@ def format_voltage_results(voltages: Dict[str, float]) -> Dict[str, Any]:
         Dict containing voltage statistics
     """
     if not voltages:
-        return {
-            "min": 0.0,
-            "max": 0.0,
-            "avg": 0.0,
-            "min_bus": "",
-            "max_bus": ""
-        }
+        return {"min": 0.0, "max": 0.0, "avg": 0.0, "min_bus": "", "max_bus": ""}
 
     min_bus = min(voltages.items(), key=lambda x: x[1])
     max_bus = max(voltages.items(), key=lambda x: x[1])
@@ -109,7 +96,7 @@ def format_voltage_results(voltages: Dict[str, float]) -> Dict[str, Any]:
         "max": max_bus[1],
         "avg": round(avg_voltage, 4),
         "min_bus": min_bus[0],
-        "max_bus": max_bus[0]
+        "max_bus": max_bus[0],
     }
 
 
@@ -129,17 +116,17 @@ def format_line_flow_results(flows: Dict[str, Dict[str, float]]) -> Dict[str, An
             "max_loading_line": "",
             "total_p": 0.0,
             "total_q": 0.0,
-            "line_count": 0
+            "line_count": 0,
         }
 
-    max_loading_line = max(flows.items(), key=lambda x: x[1].get('loading', 0))
-    total_p = sum(flow.get('P', 0) for flow in flows.values())
-    total_q = sum(flow.get('Q', 0) for flow in flows.values())
+    max_loading_line = max(flows.items(), key=lambda x: x[1].get("loading", 0))
+    total_p = sum(flow.get("P", 0) for flow in flows.values())
+    total_q = sum(flow.get("Q", 0) for flow in flows.values())
 
     return {
-        "max_loading": round(max_loading_line[1].get('loading', 0), 2),
+        "max_loading": round(max_loading_line[1].get("loading", 0), 2),
         "max_loading_line": max_loading_line[0],
         "total_p": round(total_p, 2),
         "total_q": round(total_q, 2),
-        "line_count": len(flows)
+        "line_count": len(flows),
     }

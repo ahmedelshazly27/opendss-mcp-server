@@ -42,7 +42,7 @@ def _check_line_loading() -> Dict[str, Any]:
             return {
                 "has_overloads": False,
                 "overloaded_lines": [],
-                "max_loading_pct": 0.0
+                "max_loading_pct": 0.0,
             }
 
         dss.Lines.First()
@@ -66,10 +66,9 @@ def _check_line_loading() -> Dict[str, Any]:
                     max_loading = loading_pct
 
                 if loading_pct > 100.0:
-                    overloaded_lines.append({
-                        "line": line_name,
-                        "loading_pct": round(loading_pct, 2)
-                    })
+                    overloaded_lines.append(
+                        {"line": line_name, "loading_pct": round(loading_pct, 2)}
+                    )
 
             dss.Lines.Next()
 
@@ -79,7 +78,7 @@ def _check_line_loading() -> Dict[str, Any]:
     return {
         "has_overloads": len(overloaded_lines) > 0,
         "overloaded_lines": overloaded_lines,
-        "max_loading_pct": round(max_loading, 2)
+        "max_loading_pct": round(max_loading, 2),
     }
 
 
@@ -108,13 +107,19 @@ def _add_der(bus_id: str, der_type: str, capacity_kw: float) -> bool:
 
         if der_type == "solar":
             # Add PV system
-            dss.Text.Command(f"New PVSystem.{der_name} Bus1={bus_id} kV={kv_base} kVA={capacity_kw} Pmpp={capacity_kw} irradiance=1.0")
+            dss.Text.Command(
+                f"New PVSystem.{der_name} Bus1={bus_id} kV={kv_base} kVA={capacity_kw} Pmpp={capacity_kw} irradiance=1.0"
+            )
         elif der_type == "battery":
             # Add storage
-            dss.Text.Command(f"New Storage.{der_name} Bus1={bus_id} kV={kv_base} kWrated={capacity_kw} kWhrated={capacity_kw * 4} %stored=100 %discharge=100")
+            dss.Text.Command(
+                f"New Storage.{der_name} Bus1={bus_id} kV={kv_base} kWrated={capacity_kw} kWhrated={capacity_kw * 4} %stored=100 %discharge=100"
+            )
         elif der_type == "wind":
             # Add generator (simplified wind model)
-            dss.Text.Command(f"New Generator.{der_name} Bus1={bus_id} kV={kv_base} kW={capacity_kw} PF=1.0")
+            dss.Text.Command(
+                f"New Generator.{der_name} Bus1={bus_id} kV={kv_base} kW={capacity_kw} PF=1.0"
+            )
         else:
             logger.error(f"Unsupported DER type: {der_type}")
             return False
@@ -149,7 +154,7 @@ def analyze_feeder_capacity(
     der_type: str = "solar",
     increment_kw: float = 100,
     max_capacity_kw: float = 10000,
-    constraints: Optional[Dict[str, Any]] = None
+    constraints: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Analyze maximum DER hosting capacity at a specific bus.
 
@@ -220,7 +225,9 @@ def analyze_feeder_capacity(
         if not dss.Solution.Converged():
             return format_error_response("Baseline power flow did not converge")
 
-        baseline_voltage_check = check_voltage_violations(min_voltage_pu, max_voltage_pu)
+        baseline_voltage_check = check_voltage_violations(
+            min_voltage_pu, max_voltage_pu
+        )
         baseline_loading = _check_line_loading()
 
         # Initialize capacity curve data
@@ -253,24 +260,29 @@ def analyze_feeder_capacity(
             # Check voltage violations
             voltage_check = check_voltage_violations(min_voltage_pu, max_voltage_pu)
             has_voltage_violations = (
-                voltage_check.get("success", False) and
-                voltage_check.get("data", {}).get("summary", {}).get("total_violations", 0) > 0
+                voltage_check.get("success", False)
+                and voltage_check.get("data", {})
+                .get("summary", {})
+                .get("total_violations", 0)
+                > 0
             )
 
             # Check line loading
             loading_check = _check_line_loading()
             has_loading_violations = (
-                loading_check["has_overloads"] or
-                loading_check["max_loading_pct"] > max_line_loading_pct
+                loading_check["has_overloads"]
+                or loading_check["max_loading_pct"] > max_line_loading_pct
             )
 
             # Store iteration data
             iteration_data = {
                 "capacity_kw": round(capacity, 2),
                 "converged": True,
-                "voltage_violations": voltage_check.get("data", {}).get("summary", {}).get("total_violations", 0),
+                "voltage_violations": voltage_check.get("data", {})
+                .get("summary", {})
+                .get("total_violations", 0),
                 "max_line_loading_pct": loading_check["max_loading_pct"],
-                "has_violations": has_voltage_violations or has_loading_violations
+                "has_violations": has_voltage_violations or has_loading_violations,
             }
             capacity_curve.append(iteration_data)
 
@@ -281,7 +293,11 @@ def analyze_feeder_capacity(
 
                 if has_voltage_violations:
                     limiting_constraint = "voltage_violation"
-                    worst = voltage_check.get("data", {}).get("summary", {}).get("worst_violation")
+                    worst = (
+                        voltage_check.get("data", {})
+                        .get("summary", {})
+                        .get("worst_violation")
+                    )
                     if worst:
                         violation_details = f"Voltage violation at bus {worst['bus']} phase {worst['phase']}: {worst['voltage_pu']} pu"
                     else:
@@ -293,7 +309,9 @@ def analyze_feeder_capacity(
                         line_info = overloaded[0]
                         violation_details = f"Line {line_info['line']} overloaded: {line_info['loading_pct']}%"
                     else:
-                        violation_details = f"Line loading exceeded {max_line_loading_pct}%"
+                        violation_details = (
+                            f"Line loading exceeded {max_line_loading_pct}%"
+                        )
 
                 break
 
@@ -314,24 +332,26 @@ def analyze_feeder_capacity(
             "violation_details": violation_details,
             "capacity_curve": capacity_curve,
             "baseline": {
-                "voltage_violations": baseline_voltage_check.get("data", {}).get("summary", {}).get("total_violations", 0),
-                "max_line_loading_pct": baseline_loading["max_loading_pct"]
+                "voltage_violations": baseline_voltage_check.get("data", {})
+                .get("summary", {})
+                .get("total_violations", 0),
+                "max_line_loading_pct": baseline_loading["max_loading_pct"],
             },
             "constraints": {
                 "min_voltage_pu": min_voltage_pu,
                 "max_voltage_pu": max_voltage_pu,
-                "max_line_loading_pct": max_line_loading_pct
+                "max_line_loading_pct": max_line_loading_pct,
             },
             "analysis_parameters": {
                 "increment_kw": increment_kw,
                 "max_capacity_tested_kw": max_capacity_kw,
-                "iterations_performed": iteration
-            }
+                "iterations_performed": iteration,
+            },
         }
 
         metadata = {
             "circuit_name": dss.Circuit.Name(),
-            "analysis_type": "hosting_capacity"
+            "analysis_type": "hosting_capacity",
         }
 
         return format_success_response(data, metadata)

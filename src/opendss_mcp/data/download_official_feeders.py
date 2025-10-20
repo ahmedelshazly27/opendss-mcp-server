@@ -47,7 +47,7 @@ def download_file(url: str, destination: Path) -> bool:
             content = response.read()
 
         # Write to destination
-        with open(destination, 'wb') as f:
+        with open(destination, "wb") as f:
             f.write(content)
 
         # Verify the file was written
@@ -88,7 +88,9 @@ def download_all_feeders() -> Tuple[int, int]:
     failed_feeders: List[str] = []
 
     for filename, url in FEEDER_URLS.items():
-        print(f"[{successful + failed + 1}/{len(FEEDER_URLS)}] Downloading {filename}...")
+        print(
+            f"[{successful + failed + 1}/{len(FEEDER_URLS)}] Downloading {filename}..."
+        )
 
         # Determine destination filename
         destination = FEEDERS_DIR / filename

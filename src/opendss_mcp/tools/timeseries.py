@@ -21,7 +21,7 @@ def run_time_series_simulation(
     generation_profile: str | dict | None = None,
     duration_hours: int = 24,
     timestep_minutes: int = 60,
-    output_variables: list[str] | None = None
+    output_variables: list[str] | None = None,
 ) -> dict[str, Any]:
     """
     Run time-series power flow simulation with load and generation profiles.
@@ -119,31 +119,25 @@ def run_time_series_simulation(
                 "success": False,
                 "data": {},
                 "metadata": {},
-                "errors": ["No circuit loaded. Load a feeder first using load_ieee_test_feeder()."]
+                "errors": [
+                    "No circuit loaded. Load a feeder first using load_ieee_test_feeder()."
+                ],
             }
 
         # Load profile data
         load_profile_data, load_error = _load_profile_data(load_profile, "load")
         if load_error:
             errors.append(load_error)
-            return {
-                "success": False,
-                "data": {},
-                "metadata": {},
-                "errors": errors
-            }
+            return {"success": False, "data": {}, "metadata": {}, "errors": errors}
 
         gen_profile_data = None
         if generation_profile is not None:
-            gen_profile_data, gen_error = _load_profile_data(generation_profile, "generation")
+            gen_profile_data, gen_error = _load_profile_data(
+                generation_profile, "generation"
+            )
             if gen_error:
                 errors.append(gen_error)
-                return {
-                    "success": False,
-                    "data": {},
-                    "metadata": {},
-                    "errors": errors
-                }
+                return {"success": False, "data": {}, "metadata": {}, "errors": errors}
 
         # Get base load and generation values
         base_loads, total_base_load_kw = _get_base_loads()
@@ -204,7 +198,9 @@ def run_time_series_simulation(
             converged = dss.Solution.Converged()
 
             if not converged:
-                logger.warning(f"Power flow did not converge at timestep {step} (hour {hour:.2f})")
+                logger.warning(
+                    f"Power flow did not converge at timestep {step} (hour {hour:.2f})"
+                )
 
             # Collect results for this timestep
             timestep_result = {
@@ -212,7 +208,7 @@ def run_time_series_simulation(
                 "hour": round(hour, 4),
                 "load_multiplier": round(load_mult, 4),
                 "generation_multiplier": round(gen_mult, 4) if gen_multipliers else 0.0,
-                "converged": converged
+                "converged": converged,
             }
 
             # Calculate total load
@@ -262,7 +258,7 @@ def run_time_series_simulation(
             all_total_loads=all_total_loads,
             duration_hours=duration_hours,
             num_timesteps=num_timesteps,
-            timestep_minutes=timestep_minutes
+            timestep_minutes=timestep_minutes,
         )
 
         # Prepare result
@@ -274,18 +270,20 @@ def run_time_series_simulation(
                 "profiles_applied": {
                     "load_profile_name": load_profile_data.get("name", "CUSTOM"),
                     "generation_profile_name": (
-                        gen_profile_data.get("name", "CUSTOM") if gen_profile_data else None
-                    )
-                }
+                        gen_profile_data.get("name", "CUSTOM")
+                        if gen_profile_data
+                        else None
+                    ),
+                },
             },
             "metadata": {
                 "tool": "run_time_series_simulation",
                 "duration_hours": duration_hours,
                 "timestep_minutes": timestep_minutes,
                 "num_timesteps": num_timesteps,
-                "output_variables": output_variables
+                "output_variables": output_variables,
             },
-            "errors": errors
+            "errors": errors,
         }
 
         return result
@@ -293,12 +291,7 @@ def run_time_series_simulation(
     except Exception as e:
         logger.error(f"Error in time-series simulation: {e}", exc_info=True)
         errors.append(f"Simulation error: {str(e)}")
-        return {
-            "success": False,
-            "data": {},
-            "metadata": {},
-            "errors": errors
-        }
+        return {"success": False, "data": {}, "metadata": {}, "errors": errors}
 
 
 def _validate_circuit() -> bool:
@@ -311,8 +304,7 @@ def _validate_circuit() -> bool:
 
 
 def _load_profile_data(
-    profile: str | dict,
-    profile_type: str
+    profile: str | dict, profile_type: str
 ) -> tuple[dict[str, Any] | None, str | None]:
     """
     Load profile data from file or dictionary.
@@ -355,7 +347,10 @@ def _load_profile_data(
             data = json.load(f)
 
         if "multipliers" not in data:
-            return None, f"{profile_type} profile missing 'multipliers' field: {profile_path}"
+            return (
+                None,
+                f"{profile_type} profile missing 'multipliers' field: {profile_path}",
+            )
 
         return data, None
 
@@ -545,7 +540,7 @@ def _calculate_summary_statistics(
     all_total_loads: list[float],
     duration_hours: int,
     num_timesteps: int,
-    timestep_minutes: int
+    timestep_minutes: int,
 ) -> dict[str, Any]:
     """
     Calculate summary statistics from time-series data.
@@ -556,7 +551,7 @@ def _calculate_summary_statistics(
     summary = {
         "duration_hours": duration_hours,
         "num_timesteps": num_timesteps,
-        "timestep_minutes": timestep_minutes
+        "timestep_minutes": timestep_minutes,
     }
 
     # Losses statistics
@@ -586,7 +581,9 @@ def _calculate_summary_statistics(
     # Loading statistics
     if all_loadings:
         summary["max_line_loading_pct"] = round(max(all_loadings), 2)
-        summary["avg_line_loading_pct"] = round(sum(all_loadings) / len(all_loadings), 2)
+        summary["avg_line_loading_pct"] = round(
+            sum(all_loadings) / len(all_loadings), 2
+        )
 
     # Convergence statistics
     converged_count = sum(1 for ts in timesteps_data if ts.get("converged", False))

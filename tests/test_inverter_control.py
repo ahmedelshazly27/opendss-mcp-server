@@ -8,7 +8,7 @@ from opendss_mcp.utils.inverter_control import (
     configure_volt_var_control,
     configure_volt_watt_control,
     list_available_curves,
-    get_inverter_status
+    get_inverter_status,
 )
 from opendss_mcp.tools.feeder_loader import load_ieee_test_feeder
 import opendssdirect as dss
@@ -29,7 +29,9 @@ def test_load_ieee1547_curve():
 
     # Verify expected values
     expected_points = [(0.92, 0.44), (0.98, 0.0), (1.02, 0.0), (1.08, -0.44)]
-    assert curve_points == expected_points, "IEEE1547 curve points don't match expected values"
+    assert (
+        curve_points == expected_points
+    ), "IEEE1547 curve points don't match expected values"
 
 
 def test_load_rule21_curve():
@@ -42,7 +44,9 @@ def test_load_rule21_curve():
 
     # Verify expected values
     expected_points = [(0.95, 0.44), (0.99, 0.0), (1.01, 0.0), (1.05, -0.44)]
-    assert curve_points == expected_points, "RULE21 curve points don't match expected values"
+    assert (
+        curve_points == expected_points
+    ), "RULE21 curve points don't match expected values"
 
 
 def test_load_invalid_curve():
@@ -78,7 +82,9 @@ def test_configure_volt_var():
     assert load_result["success"], f"Failed to load feeder: {load_result.get('errors')}"
 
     # Add a test PV system
-    dss.Text.Command("New PVSystem.TestPV Bus1=675 Phases=3 kV=4.16 kVA=500 Pmpp=500 irradiance=1.0")
+    dss.Text.Command(
+        "New PVSystem.TestPV Bus1=675 Phases=3 kV=4.16 kVA=500 Pmpp=500 irradiance=1.0"
+    )
 
     # Solve power flow
     dss.Solution.Solve()
@@ -90,7 +96,9 @@ def test_configure_volt_var():
 
     # Verify XYCurve was created
     all_curves = dss.XYCurves.AllNames()
-    assert any("testpv" in curve.lower() for curve in all_curves), "XYCurve should be created"
+    assert any(
+        "testpv" in curve.lower() for curve in all_curves
+    ), "XYCurve should be created"
 
     # Verify power flow still solves with control
     dss.Solution.Solve()
@@ -104,7 +112,9 @@ def test_configure_volt_var_with_rule21():
     assert load_result["success"]
 
     # Add a test PV system
-    dss.Text.Command("New PVSystem.TestPV2 Bus1=611 Phases=3 kV=4.16 kVA=300 Pmpp=300 irradiance=1.0")
+    dss.Text.Command(
+        "New PVSystem.TestPV2 Bus1=611 Phases=3 kV=4.16 kVA=300 Pmpp=300 irradiance=1.0"
+    )
 
     # Load Rule 21 curve and configure
     curve_points = load_curve("RULE21")
@@ -112,7 +122,9 @@ def test_configure_volt_var_with_rule21():
 
     # Verify XYCurve was created
     all_curves = dss.XYCurves.AllNames()
-    assert any("testpv2" in curve.lower() for curve in all_curves), "XYCurve should be created for TestPV2"
+    assert any(
+        "testpv2" in curve.lower() for curve in all_curves
+    ), "XYCurve should be created for TestPV2"
 
     # Solve and verify convergence
     dss.Solution.Solve()
@@ -126,7 +138,9 @@ def test_configure_volt_watt():
     assert load_result["success"]
 
     # Add a test PV system
-    dss.Text.Command("New PVSystem.TestPV3 Bus1=652 Phases=1 kV=2.4 kVA=200 Pmpp=200 irradiance=1.0")
+    dss.Text.Command(
+        "New PVSystem.TestPV3 Bus1=652 Phases=1 kV=2.4 kVA=200 Pmpp=200 irradiance=1.0"
+    )
 
     # Define volt-watt curve (curtail above 1.06 pu)
     vw_curve = [(0.0, 1.0), (1.06, 1.0), (1.10, 0.2)]
@@ -136,7 +150,9 @@ def test_configure_volt_watt():
 
     # Verify XYCurve was created
     all_curves = dss.XYCurves.AllNames()
-    assert any("testpv3" in curve.lower() for curve in all_curves), "XYCurve should be created for volt-watt"
+    assert any(
+        "testpv3" in curve.lower() for curve in all_curves
+    ), "XYCurve should be created for volt-watt"
 
     # Solve and verify convergence
     dss.Solution.Solve()
@@ -150,7 +166,9 @@ def test_get_inverter_status():
     assert load_result["success"]
 
     # Add a test PV system
-    dss.Text.Command("New PVSystem.TestPV4 Bus1=675 Phases=3 kV=4.16 kVA=500 Pmpp=500 irradiance=1.0")
+    dss.Text.Command(
+        "New PVSystem.TestPV4 Bus1=675 Phases=3 kV=4.16 kVA=500 Pmpp=500 irradiance=1.0"
+    )
 
     # Solve power flow
     dss.Solution.Solve()
@@ -183,7 +201,9 @@ def test_get_inverter_status_with_volt_var():
     assert load_result["success"]
 
     # Add a test PV system
-    dss.Text.Command("New PVSystem.TestPV5 Bus1=675 Phases=3 kV=4.16 kVA=500 Pmpp=500 irradiance=1.0")
+    dss.Text.Command(
+        "New PVSystem.TestPV5 Bus1=675 Phases=3 kV=4.16 kVA=500 Pmpp=500 irradiance=1.0"
+    )
 
     # Configure volt-var control
     curve_points = load_curve("IEEE1547")
@@ -247,6 +267,108 @@ def test_curve_points_format():
         assert isinstance(var, (int, float)), "Var should be numeric"
         assert 0.8 <= voltage <= 1.2, "Voltage should be in reasonable range"
         assert -0.5 <= var <= 0.5, "Var should be in typical range"
+
+
+def test_load_curve_insufficient_points():
+    """Test that curves with < 2 points raise ValueError."""
+    import tempfile
+    import json
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create invalid curve with 1 point
+        curve_file = Path(tmpdir) / "invalid_curve.json"
+        with open(curve_file, "w") as f:
+            json.dump({"points": [[0.95, 0.0]]}, f)
+
+        with pytest.raises(ValueError, match="must have at least 2 points"):
+            load_curve(str(curve_file))
+
+
+def test_load_curve_missing_points_field():
+    """Test that curves without points field raise ValueError."""
+    import tempfile
+    import json
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create curve without points field
+        curve_file = Path(tmpdir) / "no_points.json"
+        with open(curve_file, "w") as f:
+            json.dump({"name": "test", "type": "volt-var"}, f)
+
+        with pytest.raises(ValueError, match="missing 'points' field"):
+            load_curve(str(curve_file))
+
+
+def test_load_curve_invalid_json():
+    """Test that invalid JSON raises ValueError."""
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Create file with invalid JSON
+        curve_file = Path(tmpdir) / "bad.json"
+        with open(curve_file, "w") as f:
+            f.write("{ invalid json }")
+
+        with pytest.raises(ValueError, match="Invalid JSON"):
+            load_curve(str(curve_file))
+
+
+def test_configure_volt_var_insufficient_points():
+    """Test that volt-var control with < 2 points raises error."""
+    load_result = load_ieee_test_feeder("IEEE13")
+    assert load_result["success"]
+
+    dss.Text.Command("New PVSystem.TestPV Bus1=675 Phases=3 kV=4.16 kVA=500")
+
+    with pytest.raises(RuntimeError):
+        configure_volt_var_control("TestPV", [(0.95, 0.0)], response_time=10.0)
+
+
+def test_configure_volt_watt_insufficient_points():
+    """Test that volt-watt control with < 2 points raises error."""
+    load_result = load_ieee_test_feeder("IEEE13")
+    assert load_result["success"]
+
+    dss.Text.Command("New PVSystem.TestPV Bus1=675 Phases=3 kV=4.16 kVA=500")
+
+    with pytest.raises(RuntimeError):
+        configure_volt_watt_control("TestPV", [(1.0, 1.0)])
+
+
+def test_get_inverter_status_nonexistent_pv():
+    """Test getting status for non-existent PV system."""
+    load_result = load_ieee_test_feeder("IEEE13")
+    assert load_result["success"]
+
+    status = get_inverter_status("NONEXISTENT_PV")
+
+    assert status["success"] is False
+    assert len(status["errors"]) > 0
+    assert "not found" in status["errors"][0].lower()
+
+
+def test_configure_volt_watt_out_of_range_warning(caplog):
+    """Test that watt values outside [0, 1] log a warning and raise RuntimeError."""
+    import logging
+
+    caplog.set_level(logging.WARNING)
+
+    load_result = load_ieee_test_feeder("IEEE13")
+    assert load_result["success"]
+
+    dss.Text.Command("New PVSystem.TestPV Bus1=675 Phases=3 kV=4.16 kVA=500")
+
+    # Curve with value > 1.0 should log warning and then raise error from OpenDSS
+    bad_curve = [(0.0, 1.0), (1.10, 1.5)]
+
+    with pytest.raises(RuntimeError):
+        configure_volt_watt_control("TestPV", bad_curve)
+
+    # Check that warning was logged before the error
+    assert any("outside typical range" in record.message for record in caplog.records)
 
 
 if __name__ == "__main__":
