@@ -714,7 +714,7 @@ SOFTWARE.
 ### Contact
 
 - **Author:** Ahmed El-Shazly
-- **Email:** [ahmedelshazly27@example.com](mailto:ahmedelshazly27@example.com)
+- **Email:** [ahmedelshazly27@example.com](mailto:ahmedelshazlykpg@gmail.com)
 - **GitHub:** [@ahmedelshazly27](https://github.com/ahmedelshazly27)
 
 ---
