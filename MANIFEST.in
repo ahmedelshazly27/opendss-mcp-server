@@ -1,0 +1,50 @@
+# Include essential documentation
+include README.md
+include LICENSE
+include CHANGELOG.md
+
+# Include source code and data files
+recursive-include src/opendss_mcp *.py
+recursive-include src/opendss_mcp/data *.dss *.csv *.json
+
+# Include examples
+recursive-include examples *.py *.md
+
+# Exclude development and project management files
+exclude .cursorrules
+exclude .codecov.yml
+exclude claude_desktop_config.json
+exclude verify_complete.sh
+exclude test_visualization.py
+exclude package.json
+exclude package-lock.json
+
+# Exclude directories
+prune paper
+prune logo
+prune htmlcov
+prune utils
+prune node_modules
+prune .github
+prune .mypy_cache
+prune .pytest_cache
+prune .claude
+
+# Exclude all documentation that's not user-facing
+exclude CI_CD_SUMMARY.md
+exclude GITHUB_ACTIONS_COMPLETE.md
+exclude LAUNCH_CHECKLIST.md
+exclude PACKAGE_SUMMARY.md
+exclude PUBLISHING.md
+exclude VERIFICATION.md
+exclude CLAUDE.md
+
+# Exclude tests (users installing from PyPI don't need them)
+prune tests
+
+# Exclude build artifacts
+global-exclude __pycache__
+global-exclude *.py[cod]
+global-exclude .DS_Store
+global-exclude *.swp
+global-exclude *~

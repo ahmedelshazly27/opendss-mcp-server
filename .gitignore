@@ -110,3 +110,21 @@ cython_debug/
 *.bak
 *.tmp
 
+# Internal/development files (stored in separate repository)
+paper/
+logo/
+LAUNCH_CHECKLIST.md
+GITHUB_ACTIONS_COMPLETE.md
+CI_CD_SUMMARY.md
+PACKAGE_SUMMARY.md
+PUBLISHING.md
+VERIFICATION.md
+CLAUDE.md
+node_modules/
+package.json
+package-lock.json
+utils/
+test_visualization.py
+verify_complete.sh
+claude_desktop_config.json
+
