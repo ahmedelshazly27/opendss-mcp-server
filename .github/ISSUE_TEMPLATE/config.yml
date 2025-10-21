@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/ahmedelshazly27/opendss-mcp-server/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: 📚 Documentation
+    url: https://github.com/ahmedelshazly27/opendss-mcp-server#documentation
+    about: Read the documentation for usage guides and examples
+  - name: 💼 EPRI OpenDSS
+    url: https://www.epri.com/OpenDSS
+    about: Official OpenDSS documentation and support
