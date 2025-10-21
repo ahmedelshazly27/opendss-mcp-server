@@ -302,33 +302,6 @@ print(f"✓ Visualization saved: {viz_result['data']['file_path']}")
 
 ---
 
-## Use Case Highlight: Kuwait Utility DER Integration
-
-### Background
-
-Kuwait's Ministry of Electricity and Water faces challenges integrating distributed solar generation on aging distribution feeders. Traditional studies require 2-3 weeks per feeder analysis, delaying renewable energy deployment.
-
-### Challenge
-
-- **100+ feeders** requiring DER integration assessment
-- **Limited engineering resources** for detailed studies
-- **Tight deadlines** for national renewable energy targets
-- **Complex analysis** needed: hosting capacity, voltage regulation, protection coordination
-
-### Solution with OpenDSS MCP Server
-
-**Traditional Approach:**
-- 3 weeks × 100 feeders = **300 weeks** (5.8 years)
-- Multiple Python scripts
-- Manual report generation
-- High error rates
-
-**With OpenDSS MCP Server:**
-- 30 minutes × 100 feeders = **50 hours** (< 2 weeks)
-- Conversational analysis via Claude
-- Automatic visualization and reports
-- Consistent, validated results
-
 ### Workflow Example
 
 ```
@@ -358,13 +331,6 @@ Claude: ✓ Report generated with:
           • Implementation recommendations
           [PDF report attached]
 ```
-
-### Results
-
-- **Time Savings:** 300 weeks → 2 weeks (150x faster)
-- **Cost Savings:** $1.5M in engineering hours
-- **Accuracy:** Validated against field measurements (±3%)
-- **Deployment:** 87 MW solar deployed in 18 months vs. 5+ years
 
 ---
 
@@ -666,10 +632,6 @@ This project uses official IEEE test feeders:
 - **IEEE 123-bus Test Feeder** - IEEE Distribution Test Feeders Working Group
 
 Source: [IEEE PES Test Feeders](https://cmte.ieee.org/pes-testfeeders/)
-
-### Inspiration
-
-Inspired by the need to accelerate distribution planning studies for renewable energy integration, particularly in rapidly developing regions like the Middle East and North Africa.
 
 ---
 
