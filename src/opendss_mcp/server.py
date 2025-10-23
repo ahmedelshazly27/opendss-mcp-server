@@ -12,7 +12,7 @@ import sys
 from typing import Any, Dict, Optional
 
 # MCP SDK imports
-from mcp.server import Server
+from mcp.server.fastmcp import FastMCP
 
 # Local imports - All 7 tools
 from .tools.feeder_loader import load_ieee_test_feeder
@@ -32,10 +32,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Initialize MCP server
-server = Server(name="opendss-mcp-server", version="1.0.0")
+mcp = FastMCP(name="opendss-mcp-server")
 
 
-@server.tool()
+@mcp.tool()
 def load_feeder(
     feeder_id: str, modifications: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
@@ -65,7 +65,7 @@ def load_feeder(
         return {"success": False, "data": None, "metadata": None, "errors": [error_msg]}
 
 
-@server.tool()
+@mcp.tool()
 def run_power_flow_analysis(
     feeder_id: str, options: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
@@ -98,7 +98,7 @@ def run_power_flow_analysis(
         return {"success": False, "data": None, "metadata": None, "errors": [error_msg]}
 
 
-@server.tool()
+@mcp.tool()
 def check_voltages(
     min_voltage_pu: float = 0.95,
     max_voltage_pu: float = 1.05,
@@ -138,7 +138,7 @@ def check_voltages(
         return {"success": False, "data": None, "metadata": None, "errors": [error_msg]}
 
 
-@server.tool()
+@mcp.tool()
 def analyze_capacity(
     bus_id: str,
     der_type: str = "solar",
@@ -181,7 +181,7 @@ def analyze_capacity(
         return {"success": False, "data": None, "metadata": None, "errors": [error_msg]}
 
 
-@server.tool()
+@mcp.tool()
 def optimize_der(
     der_type: str,
     capacity_kw: float,
@@ -235,7 +235,7 @@ def optimize_der(
         return {"success": False, "data": None, "metadata": None, "errors": [error_msg]}
 
 
-@server.tool()
+@mcp.tool()
 def run_timeseries(
     load_profile: str | dict,
     generation_profile: Optional[str | dict] = None,
@@ -304,7 +304,7 @@ def run_timeseries(
         return {"success": False, "data": None, "metadata": None, "errors": [error_msg]}
 
 
-@server.tool()
+@mcp.tool()
 def create_visualization(
     plot_type: str,
     data_source: str = "last_power_flow",
@@ -365,7 +365,7 @@ def main() -> None:
     """Start the MCP server with stdio transport."""
     try:
         logger.info("Starting OpenDSS MCP Server")
-        server.run(transport="stdio")
+        mcp.run(transport="stdio")
     except Exception as e:
         logger.critical(f"Server error: {str(e)}", exc_info=True)
         sys.exit(1)
